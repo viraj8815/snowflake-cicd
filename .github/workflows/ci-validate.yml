@@ -1,0 +1,17 @@
+name: CI - Validate SQL on Stage Push
+
+on:
+  push:
+    branches: [stage]
+
+
+jobs:
+  validate-sql:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Run SQL Validation Script
+        run: bash .github/workflows/validate_sql.sh
