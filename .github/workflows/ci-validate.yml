@@ -4,6 +4,10 @@ on:
   push:
     branches: [stage]
 
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
   validate-sql:
     runs-on: ubuntu-latest
