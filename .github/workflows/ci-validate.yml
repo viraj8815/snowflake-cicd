@@ -4,10 +4,6 @@ on:
   push:
     branches: [stage]
 
-permissions:
-  contents: write
-  pull-requests: write
-
 jobs:
   validate-sql:
     runs-on: ubuntu-latest
@@ -18,15 +14,3 @@ jobs:
 
       - name: Run SQL Validation Script
         run: bash .github/workflows/validate_sql.sh
-
-      - name: Create Pull Request to main
-        uses: peter-evans/create-pull-request@v5
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "Auto PR: Sync changes from stage to main"
-          title: "Auto PR: Promote changes from stage to main"
-          body: |
-            This PR was created automatically by the CI pipeline.
-            Please review and merge manually.
-          base: main
-          branch: stage
