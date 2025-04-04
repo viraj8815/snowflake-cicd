@@ -30,4 +30,3 @@ jobs:
             Please review and merge manually.
           base: main
           branch: stage
-
