@@ -12,7 +12,7 @@ for file in sql/tables/*.sql sql/views/*.sql sql/UDF/*.sql; do
     --warehouse "${SNOWFLAKE_WAREHOUSE}" \
     --database "${SNOWFLAKE_DATABASE}" \
     --schema "${SNOWFLAKE_SCHEMA}" \
-    --file "$file"
+    --filename "$file"
 done
 
 echo "✅ Deployment to Snowflake complete."
