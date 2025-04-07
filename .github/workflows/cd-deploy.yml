@@ -12,8 +12,24 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Simulate Deployment
+      - name: Set up Python and Install Snow CLI
         run: |
-          echo "🚀 Deploying SQL to production..."
-          find sql/production -name "*.sql"
-          echo "✅ Deployment complete (simulated)"
+          python3 -m venv env
+          source env/bin/activate
+          pip install snowflake-cli-labs
+
+      - name: Deploy SQL to Snowflake (Prod)
+        env:
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+          SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
+          SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_PROD_DB }}
+          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_PROD_SCHEMA }}
+          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WH }}
+        run: |
+          echo "Deploying to PROD..."
+          find sql/production -name "*.sql" | while read file; do
+            echo "Running $file"
+            snow sql -q "$(cat $file)"
+          done

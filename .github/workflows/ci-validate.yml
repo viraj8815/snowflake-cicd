@@ -1,16 +1,38 @@
-name: CI - Validate SQL on Stage Push
+name: Deploy SQL to Stage
 
 on:
   push:
-    branches: [stage]
+    branches:
+      - stage
 
 jobs:
-  validate-sql:
+  deploy-to-stage:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Run SQL Validation Script
-        run: bash .github/workflows/validate_sql.sh
+      - name: Set up Python and Install SnowSQL
+        run: |
+          python3 -m pip install --upgrade pip
+          pip install snowflake-cli-labs
+
+      - name: Verify Snow CLI install
+        run: snow --help
+  
+      - name: Deploy SQL to Snowflake (Stage)
+        env:
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+          SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
+          SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_STAGE_DB }}
+          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_STAGE_SCHEMA }}
+          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WH }}
+        run: |
+          echo "Deploying SQL to Snowflake STAGE..."
+          find sql/staging -name "*.sql" | while read file; do
+            echo "Running $file"
+            snow sql -q "$(cat $file)"
+          done
