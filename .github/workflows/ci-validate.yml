@@ -11,14 +11,15 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-
+         
       - name: Install SnowSQL
         run: |
-            curl -O https://sfc-repo.snowflakecomputing.com/snowsql/bootstrap/1.2/linux_x86_64/snowsql-linux_x86_64.gz
-            gunzip snowsql-linux_x86_64.gz
-            chmod +x snowsql-linux_x86_64
-            sudo mv snowsql-linux_x86_64 /usr/local/bin/snowsql
-            
+            sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 82B129927FA3303E
+            echo "deb https://sfc-repo.snowflakecomputing.com/apt stable main" | sudo tee /etc/apt/sources.list.d/snowflake.list
+            sudo apt-get update
+            sudo apt-get install -y snowflake-snowsql
+          
+
       - name: Deploy SQL to STAGE_DB
         env:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWSQL_ACCOUNT }}
