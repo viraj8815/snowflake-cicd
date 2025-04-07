@@ -1,6 +1,7 @@
 #!/bin/bash
 echo "🔍 Running SQLFluff Lint on staging SQL files..."
-sqlfluff lint sql/tables/*.sql sql/views/*.sql sql/UDF/*.sql
+sqlfluff lint sql/tables/*.sql sql/views/*.sql sql/UDF/*.sql --dialect snowflake
+echo "✅ Linting finished."
 
 if [ $? -ne 0 ]; then
   echo "SQL Linting failed."
