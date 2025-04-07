@@ -1,15 +1,16 @@
 #!/bin/bash
 
-echo "Connecting to Snowflake..."
-echo "Executing SQL file: $1"
+echo "Deploying SQL scripts to Snowflake..."
 
-snowsql -a $SNOWFLAKE_ACCOUNT \
-        -u $SNOWFLAKE_USER \
-        -p $SNOWFLAKE_PWD \
-        -r $SNOWFLAKE_ROLE \
-        -w $SNOWFLAKE_WAREHOUSE \
-        -d $SNOWFLAKE_DATABASE \
-        -s $SNOWFLAKE_SCHEMA \
-        -f "$1"
+for file in $(find sql/ -type f -name "*.sql"); do
+  echo "Executing $file..."
+  snowsql -a "$SNOWFLAKE_ACCOUNT" \
+          -u "$SNOWFLAKE_USER" \
+          -r "$SNOWFLAKE_ROLE" \
+          -w "$SNOWFLAKE_WH" \
+          -d "$SNOWFLAKE_DB" \
+          -s "$SNOWFLAKE_SCHEMA" \
+          -q "$(cat $file)"
+done
 
-echo "SQL deployment complete."
+echo "Deployment to Snowflake complete."

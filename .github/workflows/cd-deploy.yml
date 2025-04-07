@@ -12,11 +12,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Set up Python and Install Snow CLI
+      - name: Set up Python and Install SnowSQL
         run: |
-          python3 -m venv env
-          source env/bin/activate
-          pip install snowflake-cli-labs
+          sudo apt-get update
+          sudo apt-get install -y unzip curl
+          curl -O https://sfc-repo.snowflakecomputing.com/snowsql/bootstrap/1.2/linux_x86_64/snowsql-linux_x86_64.bash
+          bash snowsql-linux_x86_64.bash
+
+      - name: Verify SnowSQL install
+        run: ~/.snowsql/snowsql --version
 
       - name: Deploy SQL to Snowflake (Prod)
         env:
@@ -24,12 +28,7 @@ jobs:
           SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
           SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
           SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
-          SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_PROD_DB }}
-          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_PROD_SCHEMA }}
-          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WH }}
-        run: |
-          echo "Deploying to PROD..."
-          find sql/production -name "*.sql" | while read file; do
-            echo "Running $file"
-            snow sql -q "$(cat $file)"
-          done
+          SNOWFLAKE_WH: ${{ secrets.SNOWFLAKE_WH }}
+          SNOWFLAKE_DB: ${{ secrets.SNOWFLAKE_DB }}
+          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
+        run: bash .github/workflows/deploy_snowflake.sh

@@ -1,12 +1,28 @@
-name: Deploy SQL to Stage
+name: CI - Validate and Deploy to Stage
 
 on:
   push:
-    branches:
-      - stage
+    branches: [stage]
 
 jobs:
+  validate-sql:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python and install SQLFluff
+        run: |
+          python -m venv venv
+          source venv/bin/activate
+          pip install sqlfluff
+
+      - name: Run SQL Validation Script
+        run: bash .github/workflows/validate_sql.sh
+
   deploy-to-stage:
+    needs: validate-sql
     runs-on: ubuntu-latest
 
     steps:
@@ -15,24 +31,21 @@ jobs:
 
       - name: Set up Python and Install SnowSQL
         run: |
-          python3 -m pip install --upgrade pip
-          pip install snowflake-cli-labs
+          sudo apt-get update
+          sudo apt-get install -y unzip curl
+          curl -O https://sfc-repo.snowflakecomputing.com/snowsql/bootstrap/1.2/linux_x86_64/snowsql-linux_x86_64.bash
+          bash snowsql-linux_x86_64.bash
 
-      - name: Verify Snow CLI install
-        run: snow --help
-  
+      - name: Verify SnowSQL install
+        run: ~/.snowsql/snowsql --version
+
       - name: Deploy SQL to Snowflake (Stage)
         env:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
           SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
           SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
           SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
-          SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_STAGE_DB }}
-          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_STAGE_SCHEMA }}
-          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WH }}
-        run: |
-          echo "Deploying SQL to Snowflake STAGE..."
-          find sql/staging -name "*.sql" | while read file; do
-            echo "Running $file"
-            snow sql -q "$(cat $file)"
-          done
+          SNOWFLAKE_WH: ${{ secrets.SNOWFLAKE_WH }}
+          SNOWFLAKE_DB: ${{ secrets.SNOWFLAKE_DB }}         # You can use a separate STAGE_DB secret if needed
+          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }} # Or STAGE_SCHEMA
+        run: bash .github/workflows/deploy_snowflake.sh
