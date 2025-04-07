@@ -5,28 +5,31 @@ on:
     branches: [main]
 
 jobs:
-  deploy-to-prod:
+  deploy-prod:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Install SnowSQL
+      - name: Set up Python and Install Snow CLI
         run: |
-          sudo apt-get install -y curl unzip
-          curl -O https://sfc-repo.snowflakecomputing.com/snowsql/bootstrap/1.2/linux_x86_64/snowsql-1.2.21-linux_x86_64.bash
-          bash snowsql-1.2.21-linux_x86_64.bash
+          python3 -m venv env
+          source env/bin/activate
+          pip install snowflake-cli-labs
 
-      - name: Deploy SQL to PROD_DB
+      - name: Deploy SQL to Snowflake (Prod)
         env:
-          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWSQL_ACCOUNT }}
-          SNOWFLAKE_USER: ${{ secrets.SNOWSQL_USER }}
-          SNOWFLAKE_PWD: ${{ secrets.SNOWSQL_PWD }}
-          SNOWFLAKE_ROLE: ${{ secrets.SNOWSQL_ROLE }}
-          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWSQL_WAREHOUSE }}
-          SNOWFLAKE_DATABASE: ${{ secrets.SNOWSQL_DATABASE_PROD }}
-          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWSQL_SCHEMA }}
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+          SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
+          SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_PROD_DB }}
+          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_PROD_SCHEMA }}
+          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WH }}
         run: |
-          chmod +x .github/workflows/deploy_snowflake.sh
-          .github/workflows/deploy_snowflake.sh sql/tables/prod_create.sql
+          echo "Deploying to PROD..."
+          find sql/production -name "*.sql" | while read file; do
+            echo "Running $file"
+            snow sql -q "$(cat $file)"
+          done
