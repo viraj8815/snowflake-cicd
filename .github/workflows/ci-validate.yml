@@ -29,16 +29,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
          
-      - name: Set up Python and install SnowSQL
+      - name: Set up Python and Install Snowflake CLI
         run: |
-            python3 -m venv venv
-            source venv/bin/activate
-            pip install --upgrade pip
-            pip install snowflake-cli-labs
+          python3 -m pip install --upgrade pip
+          pip install snowflake-cli-labs
+      
         
 
       - name: Verify SnowSQL install
-        run: ~/.snowsql/snowsql --version
+        run: snow --version
 
       - name: Deploy SQL to Snowflake (Stage)
         env:
