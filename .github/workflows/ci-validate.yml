@@ -1,8 +1,9 @@
-name: CI - Deploy to Staging
+name: Deploy SQL to Stage
 
 on:
   push:
-    branches: [stage]
+    branches:
+      - stage
 
 jobs:
   deploy-to-stage:
@@ -11,24 +12,29 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-         
-      - name: Install SnowSQL
-        run: |
-            sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 82B129927FA3303E
-            echo "deb https://sfc-repo.snowflakecomputing.com/apt stable main" | sudo tee /etc/apt/sources.list.d/snowflake.list
-            sudo apt-get update
-            sudo apt-get install -y snowflake-snowsql
-          
 
-      - name: Deploy SQL to STAGE_DB
-        env:
-          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWSQL_ACCOUNT }}
-          SNOWFLAKE_USER: ${{ secrets.SNOWSQL_USER }}
-          SNOWFLAKE_PWD: ${{ secrets.SNOWSQL_PWD }}
-          SNOWFLAKE_ROLE: ${{ secrets.SNOWSQL_ROLE }}
-          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWSQL_WAREHOUSE }}
-          SNOWFLAKE_DATABASE: ${{ secrets.SNOWSQL_DATABASE_STAGE }}
-          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWSQL_SCHEMA }}
+      - name: Set up Python and pipx
         run: |
-          chmod +x .github/workflows/deploy_snowflake.sh
-          .github/workflows/deploy_snowflake.sh sql/tables/stage_create.sql
+          python3 -m pip install --upgrade pip
+          python3 -m pip install pipx
+          pipx ensurepath
+          pipx install snowflake-cli-labs
+
+      - name: Verify SnowSQL install
+        run: snowsql --version
+
+      - name: Deploy SQL to Snowflake (Stage)
+        env:
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+          SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
+          SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_STAGE_DB }}
+          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_STAGE_SCHEMA }}
+          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WH }}
+        run: |
+          echo "Deploying SQL to staging Snowflake..."
+          find sql/staging -name "*.sql" | while read file; do
+            echo "Running $file"
+            snowsql -a "$SNOWFLAKE_ACCOUNT" -u "$SNOWFLAKE_USER" -r "$SNOWFLAKE_ROLE" -d "$SNOWFLAKE_DATABASE" -s "$SNOWFLAKE_SCHEMA" -w "$SNOWFLAKE_WAREHOUSE" -p "$SNOWFLAKE_PASSWORD" -f "$file"
+          done
