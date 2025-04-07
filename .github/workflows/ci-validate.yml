@@ -12,5 +12,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Run SQL Validation Script
+      - name: Install sqlfluff
+        run: pip install sqlfluff
+
+      - name: Run SQL Validation
         run: bash .github/workflows/validate_sql.sh
