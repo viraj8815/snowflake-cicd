@@ -18,9 +18,9 @@ jobs:
           python3 -m pip install --upgrade pip
           pip install snowflake-cli-labs
 
-      - name: Verify SnowSQL install
-        run: snowsql --version
-
+      - name: Verify Snow CLI install
+        run: snow --help
+  
       - name: Deploy SQL to Snowflake (Stage)
         env:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
@@ -34,5 +34,5 @@ jobs:
           echo "Deploying SQL to Snowflake STAGE..."
           find sql/staging -name "*.sql" | while read file; do
             echo "Running $file"
-            snowsql -a "$SNOWFLAKE_ACCOUNT" -u "$SNOWFLAKE_USER" -r "$SNOWFLAKE_ROLE" -d "$SNOWFLAKE_DATABASE" -s "$SNOWFLAKE_SCHEMA" -w "$SNOWFLAKE_WAREHOUSE" -p "$SNOWFLAKE_PASSWORD" -f "$file"
+            snow sql -q "$(cat $file)"
           done
