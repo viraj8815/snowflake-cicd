@@ -4,7 +4,7 @@ echo "🚀 Deploying SQL scripts to Snowflake..."
 for file in sql/tables/*.sql sql/views/*.sql sql/UDF/*.sql; do
   echo "🔹 Executing $file..."
   snow sql -f "$file" \
-    --account-name "$SNOWFLAKE_ACCOUNT" \
+    --account "$SNOWFLAKE_ACCOUNT" \
     --username "$SNOWFLAKE_USERNAME" \
     --password "$SNOWFLAKE_PASSWORD" \
     --role "$SNOWFLAKE_ROLE" \
