@@ -1,4 +1,5 @@
 #!/bin/bash
+
 echo "🚀 Deploying SQL scripts to Snowflake..."
 
 for file in sql/tables/*.sql sql/views/*.sql sql/UDF/*.sql; do
@@ -12,7 +13,9 @@ for file in sql/tables/*.sql sql/views/*.sql sql/UDF/*.sql; do
     --warehouse "${SNOWFLAKE_WAREHOUSE}" \
     --database "${SNOWFLAKE_DATABASE}" \
     --schema "${SNOWFLAKE_SCHEMA}" \
-    --filename "$file"
+    --filename "$file" \
+    --non-interactive \
+    --quiet
 done
 
 echo "✅ Deployment to Snowflake complete."
