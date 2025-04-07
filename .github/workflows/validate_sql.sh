@@ -1,9 +1,6 @@
 #!/bin/bash
-
 echo "🔍 Running SQLFluff Lint on staging SQL files..."
-
-# Lint all .sql files in sql/ folder
-sqlfluff lint sql/
+sqlfluff lint sql/tables/*.sql sql/views/*.sql sql/UDF/*.sql
 
 if [ $? -ne 0 ]; then
   echo "SQL Linting failed."
