@@ -14,10 +14,11 @@ jobs:
 
       - name: Install SnowSQL
         run: |
-          sudo apt-get install -y curl unzip
-          curl -O https://sfc-repo.snowflakecomputing.com/snowsql/bootstrap/1.2/linux_x86_64/snowsql-1.2.21-linux_x86_64.bash
-          bash snowsql-1.2.21-linux_x86_64.bash
-
+            curl -O https://sfc-repo.snowflakecomputing.com/snowsql/bootstrap/1.2/linux_x86_64/snowsql-linux_x86_64.gz
+            gunzip snowsql-linux_x86_64.gz
+            chmod +x snowsql-linux_x86_64
+            sudo mv snowsql-linux_x86_64 /usr/local/bin/snowsql
+            
       - name: Deploy SQL to STAGE_DB
         env:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWSQL_ACCOUNT }}
