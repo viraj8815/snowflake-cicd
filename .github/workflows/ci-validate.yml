@@ -13,12 +13,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Set up Python and pipx
+      - name: Set up Python and Install SnowSQL
         run: |
           python3 -m pip install --upgrade pip
-          python3 -m pip install pipx
-          pipx ensurepath
-          pipx install snowflake-cli-labs
+          pip install snowflake-cli-labs
 
       - name: Verify SnowSQL install
         run: snowsql --version
@@ -33,7 +31,7 @@ jobs:
           SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_STAGE_SCHEMA }}
           SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WH }}
         run: |
-          echo "Deploying SQL to staging Snowflake..."
+          echo "Deploying SQL to Snowflake STAGE..."
           find sql/staging -name "*.sql" | while read file; do
             echo "Running $file"
             snowsql -a "$SNOWFLAKE_ACCOUNT" -u "$SNOWFLAKE_USER" -r "$SNOWFLAKE_ROLE" -d "$SNOWFLAKE_DATABASE" -s "$SNOWFLAKE_SCHEMA" -w "$SNOWFLAKE_WAREHOUSE" -p "$SNOWFLAKE_PASSWORD" -f "$file"
