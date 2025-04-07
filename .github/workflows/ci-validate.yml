@@ -1,19 +1,32 @@
-name: CI - Validate SQL on Stage Push
+name: CI - Deploy to Staging
 
 on:
   push:
     branches: [stage]
 
 jobs:
-  validate-sql:
+  deploy-to-stage:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Install sqlfluff
-        run: pip install sqlfluff
+      - name: Install SnowSQL
+        run: |
+          sudo apt-get install -y curl unzip
+          curl -O https://sfc-repo.snowflakecomputing.com/snowsql/bootstrap/1.2/linux_x86_64/snowsql-1.2.21-linux_x86_64.bash
+          bash snowsql-1.2.21-linux_x86_64.bash
 
-      - name: Run SQL Validation
-        run: bash .github/workflows/validate_sql.sh
+      - name: Deploy SQL to STAGE_DB
+        env:
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWSQL_ACCOUNT }}
+          SNOWFLAKE_USER: ${{ secrets.SNOWSQL_USER }}
+          SNOWFLAKE_PWD: ${{ secrets.SNOWSQL_PWD }}
+          SNOWFLAKE_ROLE: ${{ secrets.SNOWSQL_ROLE }}
+          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWSQL_WAREHOUSE }}
+          SNOWFLAKE_DATABASE: ${{ secrets.SNOWSQL_DATABASE_STAGE }}
+          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWSQL_SCHEMA }}
+        run: |
+          chmod +x .github/workflows/deploy_snowflake.sh
+          .github/workflows/deploy_snowflake.sh sql/tables/stage_create.sql
