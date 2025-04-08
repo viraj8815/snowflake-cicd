@@ -1,16 +1,7 @@
-#!/bin/bash
-echo "🔍 Running SQLFluff Lint on staging SQL files..."
-sqlfluff lint sql/tables/*.sql sql/views/*.sql sql/UDF/*.sql --dialect snowflake
-echo "✅ Linting finished."
+USE DATABASE {{ secrets.SNOWSQL_DATABASE_STAGE }};
+USE SCHEMA {{ secrets.SNOWSQL_SCHEMA }};
 
-if [ $? -ne 0 ]; then
-  echo "SQL Linting failed."
-  exit 1
-else
-  echo "SQL Linting passed."
-fi
-
-echo "🔍 Syntax Check (Dry Run Simulation)..."
-find sql/ -name "*.sql" -print -exec cat {} \;
-
-echo "Syntax check complete."
+-- Simulate applying all SQL
+!source sql/tables/sample_table.sql;
+!source sql/views/sample_view.sql;
+!source sql/UDF/sample_udf.sql;

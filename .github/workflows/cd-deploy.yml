@@ -1,34 +1,30 @@
-name: CD - Deploy to Production
+name: CD - Snowflake Deployment
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
 
 jobs:
-  deploy-prod:
+  deploy-to-prod:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v3
 
-      - name: Set up Python and Install SnowSQL
+      - name: Install schemachange
+        run: pip install schemachange
+
+      - name: Deploy to Snowflake (Prod)
         run: |
-          sudo apt-get update
-          sudo apt-get install -y unzip curl
-          curl -O https://sfc-repo.snowflakecomputing.com/snowsql/bootstrap/1.2/linux_x86_64/snowsql-linux_x86_64.bash
-          bash snowsql-linux_x86_64.bash
-
-      - name: Verify SnowSQL install
-        run: ~/.snowsql/snowsql --version
-
-      - name: Deploy SQL to Snowflake (Prod)
+          schemachange -f sql/ \
+            -a ${{ secrets.SNOWSQL_ACCOUNT }} \
+            -u ${{ secrets.SNOWSQL_USER }} \
+            -r ${{ secrets.SNOWSQL_ROLE }} \
+            -w ${{ secrets.SNOWSQL_WAREHOUSE }} \
+            -d ${{ secrets.SNOWSQL_DATABASE_PROD }} \
+            -c CHANGE_HISTORY \
+            -s ${{ secrets.SNOWSQL_SCHEMA }}
         env:
-          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
-          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
-          SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
-          SNOWFLAKE_WH: ${{ secrets.SNOWFLAKE_WH }}
-          SNOWFLAKE_DB: ${{ secrets.SNOWFLAKE_DB }}
-          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
-        run: bash .github/workflows/deploy_snowflake.sh
+          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWSQL_PWD }}
