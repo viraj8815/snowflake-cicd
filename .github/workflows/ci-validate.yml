@@ -10,27 +10,26 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v3
 
-      - name: Install SnowSQL
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y unzip
-          curl -O https://sfc-repo.snowflakecomputing.com/snowsql/bootstrap/1.2/linux_x86_64/snowsql-linux_x86_64.zip
-          unzip snowsql-linux_x86_64.zip
-          ./snowsql-linux_x86_64/install
-          export PATH=$PATH:$PWD/snowsql-linux_x86_64
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install SnowSQL via pip
+        run: pip install snowflake-cli-labs
 
       - name: Deploy SQL to Snowflake Stage DB
         run: |
-          ./snowsql-linux_x86_64/snowsql \
+          snowsql \
             -a ${{ secrets.SNOWSQL_ACCOUNT }} \
             -u ${{ secrets.SNOWSQL_USER }} \
             -r ${{ secrets.SNOWSQL_ROLE }} \
             -w ${{ secrets.SNOWSQL_WAREHOUSE }} \
             -d ${{ secrets.SNOWSQL_DATABASE_STAGE }} \
             -s ${{ secrets.SNOWSQL_SCHEMA }} \
-            -f .github/workflows/validate_sql.sql
+            -f sql/tables/stage_create.sql
         env:
           SNOWSQL_PWD: ${{ secrets.SNOWSQL_PWD }}
