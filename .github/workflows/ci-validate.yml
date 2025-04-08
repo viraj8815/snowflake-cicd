@@ -32,12 +32,12 @@ jobs:
           echo "database = '${{ secrets.SNOWSQL_DATABASE_STAGE }}'" >> connections.toml
           echo "schema = '${{ secrets.SNOWSQL_SCHEMA }}'" >> connections.toml
 
-      - name: Debug connections.toml (safe)
+      - name: Debug connections.toml
         run: |
-          echo "---- connections.toml ----"
+          echo "----- connections.toml -----"
           cat connections.toml | sed 's/password = .*/password = "***"/'
-          echo "--------------------------"
+          echo "----------------------------"
 
-      - name: Run schemachange (STAGE)
+      - name: Run schemachange on STAGE_DB
         run: |
           schemachange -f sql --create-change-history-table
