@@ -1,4 +1,4 @@
-name: CI - Deploy to Stage
+name: CI - Deploy to STAGE using schemachange
 
 on:
   push:
@@ -6,30 +6,29 @@ on:
       - stage
 
 jobs:
-  deploy-to-stage:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
 
-      - name: Install SnowSQL via pip
-        run: pip install snowflake-cli-labs
+      - name: Install schemachange
+        run: pip install schemachange
 
-      - name: Deploy SQL to Snowflake Stage DB
+      - name: Deploy to Snowflake STAGE using schemachange
         run: |
-          snowsql \
+          schemachange -f sql/scripts \
             -a ${{ secrets.SNOWSQL_ACCOUNT }} \
             -u ${{ secrets.SNOWSQL_USER }} \
             -r ${{ secrets.SNOWSQL_ROLE }} \
             -w ${{ secrets.SNOWSQL_WAREHOUSE }} \
             -d ${{ secrets.SNOWSQL_DATABASE_STAGE }} \
-            -s ${{ secrets.SNOWSQL_SCHEMA }} \
-            -f sql/tables/stage_create.sql
+            -c STAGE_CHANGE_HISTORY \
+            -s ${{ secrets.SNOWSQL_SCHEMA }}
         env:
-          SNOWSQL_PWD: ${{ secrets.SNOWSQL_PWD }}
+          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWSQL_PWD }}
