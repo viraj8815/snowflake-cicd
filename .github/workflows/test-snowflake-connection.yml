@@ -17,13 +17,13 @@ jobs:
 
       - name: Test Snowflake Login via CLI
         env:
-          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SNOWFLAKE_USERNAME: ${{ secrets.SNOWFLAKE_USERNAME }}
-          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
-          SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
-          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
-          SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
-          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWSQL_ACCOUNT }}
+          SNOWFLAKE_USERNAME: ${{ secrets.SNOWSQL_USER }}
+          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWSQL_PWD }}
+          SNOWFLAKE_ROLE: ${{ secrets.SNOWSQL_ROLE }}
+          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWSQL_WAREHOUSE }}
+          SNOWFLAKE_DATABASE: ${{ secrets.SNOWSQL_DATABASE_STAGE }}
+          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWSQL_SCHEMA }}
         run: |
           echo "⏳ Connecting to Snowflake..."
           snow sql --query "SELECT CURRENT_TIMESTAMP;" \
