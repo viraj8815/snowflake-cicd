@@ -1,4 +1,4 @@
-name: Snowflake CD Pipeline (Prod)
+name: Snowflake CD Pipeline (PROD)
 
 on:
   push:
@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v3
 
       - name: Set up Python
@@ -21,25 +21,17 @@ jobs:
       - name: Install schemachange
         run: pip install schemachange
 
-      - name: Create connections.toml
+      - name: Deploy to PROD_DB using schemachange
+        env:
+          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
         run: |
-          echo "[connections.default]" > connections.toml
-          echo "user = '${{ secrets.SNOWSQL_USER }}'" >> connections.toml
-          echo "password = '${{ secrets.SNOWSQL_PWD }}'" >> connections.toml
-          echo "account = '${{ secrets.SNOWSQL_ACCOUNT }}'" >> connections.toml
-          echo "role = '${{ secrets.SNOWSQL_ROLE }}'" >> connections.toml
-          echo "warehouse = '${{ secrets.SNOWSQL_WAREHOUSE }}'" >> connections.toml
-          echo "database = '${{ secrets.SNOWSQL_DATABASE_PROD }}'" >> connections.toml
-          echo "schema = '${{ secrets.SNOWSQL_SCHEMA }}'" >> connections.toml
-
-      - name: Debug connections.toml (safe)
-        run: |
-          echo "---- connections.toml ----"
-          cat connections.toml | sed 's/password = .*/password = "***"/'
-          echo "--------------------------"
-
-      - name: Run schemachange (PROD)
-        run: |
-          schemachange -f sql --create-change-history-table
-
-          
+          schemachange \
+            -f sql \
+            -a "${{ secrets.SNOWFLAKE_ACCOUNT }}" \
+            -u "${{ secrets.SNOWFLAKE_USER }}" \
+            -r "${{ secrets.SNOWFLAKE_ROLE }}" \
+            -w "${{ secrets.SNOWFLAKE_WAREHOUSE }}" \
+            -d "PROD_DB" \                                   # Deploying to PROD_DB
+            -s "${{ secrets.SNOWFLAKE_SCHEMA }}" \
+            -c "PROD_DB.SCHEMACHANGE.CHANGE_HISTORY" \
+            --create-change-history-table
