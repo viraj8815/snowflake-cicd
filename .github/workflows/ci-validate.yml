@@ -1,4 +1,4 @@
-name: Snowflake CI Pipeline (STAGE - TEST HARDCODED)
+name: Snowflake CI Pipeline (STAGE - FINAL TEST)
 
 on:
   push:
@@ -21,23 +21,27 @@ jobs:
       - name: Install schemachange
         run: pip install schemachange
 
-      - name: Create hardcoded connections.toml (TEMP)
+      - name: Set hardcoded env vars and run schemachange
+        env:
+          SNOWFLAKE_USER: VIRAJVJ8815
+          SNOWFLAKE_PASSWORD: Viraj@1234567890
+          SNOWFLAKE_ACCOUNT: jx18523.south-central-us.azure
+          SNOWFLAKE_ROLE: ACCOUNTADMIN
+          SNOWFLAKE_WAREHOUSE: COMPUTE_WH
+          SNOWFLAKE_DATABASE: STAGE_DB
+          SNOWFLAKE_SCHEMA: PUBLIC
         run: |
           echo "[connections.default]" > connections.toml
-          echo "user = 'VIRAJVJ8815'" >> connections.toml
-          echo "password = 'Viraj@1234567890'" >> connections.toml
-          echo "account = 'jx18523.south-central-us.azure'" >> connections.toml
-          echo "role = 'ACCOUNTADMIN'" >> connections.toml
-          echo "warehouse = 'COMPUTE_WH'" >> connections.toml
-          echo "database = 'STAGE_DB'" >> connections.toml
-          echo "schema = 'PUBLIC'" >> connections.toml
+          echo "user = '${SNOWFLAKE_USER}'" >> connections.toml
+          echo "password = '${SNOWFLAKE_PASSWORD}'" >> connections.toml
+          echo "account = '${SNOWFLAKE_ACCOUNT}'" >> connections.toml
+          echo "role = '${SNOWFLAKE_ROLE}'" >> connections.toml
+          echo "warehouse = '${SNOWFLAKE_WAREHOUSE}'" >> connections.toml
+          echo "database = '${SNOWFLAKE_DATABASE}'" >> connections.toml
+          echo "schema = '${SNOWFLAKE_SCHEMA}'" >> connections.toml
 
-      - name: Debug connections.toml (safe)
-        run: |
           echo "----- connections.toml -----"
           cat connections.toml | sed 's/password = .*/password = "***"/'
           echo "----------------------------"
 
-      - name: Run schemachange on STAGE_DB
-        run: |
           schemachange -f sql --create-change-history-table
