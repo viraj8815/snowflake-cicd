@@ -21,30 +21,17 @@ jobs:
       - name: Install schemachange
         run: pip install schemachange
 
-      - name: Create connections.toml for PROD
+      - name: Run schemachange (deploy to PROD_DB)
         env:
-          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
           SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
-          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
-          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
-          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
         run: |
-          echo "[connections.default]" > connections.toml
-          echo "user = \"$SNOWFLAKE_USER\"" >> connections.toml
-          echo "password = \"$SNOWFLAKE_PASSWORD\"" >> connections.toml
-          echo "account = \"$SNOWFLAKE_ACCOUNT\"" >> connections.toml
-          echo "role = \"$SNOWFLAKE_ROLE\"" >> connections.toml
-          echo "warehouse = \"$SNOWFLAKE_WAREHOUSE\"" >> connections.toml
-          echo "database = \"PROD_DB\"" >> connections.toml
-          echo "schema = \"$SNOWFLAKE_SCHEMA\"" >> connections.toml
-
-      - name: Show config (mask password)
-        run: |
-          echo "----- connections.toml -----"
-          cat connections.toml | sed 's/password = .*/password = "***"/'
-          echo "----------------------------"
-
-      - name: Run schemachange deployment for PROD
-        run: |
-          schemachange -f sql --create-change-history-table
+          schemachange \
+            -f sql \
+            -a "${{ secrets.SNOWFLAKE_ACCOUNT }}" \
+            -u "${{ secrets.SNOWFLAKE_USER }}" \
+            -r "${{ secrets.SNOWFLAKE_ROLE }}" \
+            -w "${{ secrets.SNOWFLAKE_WAREHOUSE }}" \
+            -d "PROD_DB" \
+            -s "${{ secrets.SNOWFLAKE_SCHEMA }}" \
+            -c "PROD_DB.SCHEMACHANGE.CHANGE_HISTORY" \
+            --create-change-history-table
