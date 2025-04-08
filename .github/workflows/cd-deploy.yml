@@ -1,34 +1,37 @@
-name: CD - Deploy to Production
+name: Snowflake CD Pipeline (PROD)
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
 
 jobs:
-  deploy-prod:
+  deploy-to-prod:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Set up Python and Install SnowSQL
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y unzip curl
-          curl -O https://sfc-repo.snowflakecomputing.com/snowsql/bootstrap/1.2/linux_x86_64/snowsql-linux_x86_64.bash
-          bash snowsql-linux_x86_64.bash
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
 
-      - name: Verify SnowSQL install
-        run: ~/.snowsql/snowsql --version
+      - name: Install schemachange
+        run: pip install schemachange
 
-      - name: Deploy SQL to Snowflake (Prod)
+      - name: Deploy to PROD_DB using schemachange
         env:
-          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
           SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
-          SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
-          SNOWFLAKE_WH: ${{ secrets.SNOWFLAKE_WH }}
-          SNOWFLAKE_DB: ${{ secrets.SNOWFLAKE_DB }}
-          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
-        run: bash .github/workflows/deploy_snowflake.sh
+        run: |
+          schemachange \
+            -f sql \
+            -a "${{ secrets.SNOWFLAKE_ACCOUNT }}" \
+            -u "${{ secrets.SNOWFLAKE_USER }}" \
+            -r "${{ secrets.SNOWFLAKE_ROLE }}" \
+            -w "${{ secrets.SNOWFLAKE_WAREHOUSE }}" \
+            -d "PROD_DB" \                                   # Deploying to PROD_DB
+            -s "${{ secrets.SNOWFLAKE_SCHEMA }}" \
+            -c "PROD_DB.SCHEMACHANGE.CHANGE_HISTORY" \
+            --create-change-history-table
