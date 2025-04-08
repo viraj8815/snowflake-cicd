@@ -1,5 +1,5 @@
 CREATE OR REPLACE TABLE PROD_DB.PUBLIC.sample_prod_table (
-  id INT,
+  ID INT,
   name STRING,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
 );
