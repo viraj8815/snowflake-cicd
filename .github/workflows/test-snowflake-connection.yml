@@ -27,7 +27,7 @@ jobs:
         run: |
           echo "⏳ Connecting to Snowflake..."
           snow sql \
-            --account-name "$SNOWFLAKE_ACCOUNT" \
+            --account "$SNOWFLAKE_ACCOUNT" \
             --username "$SNOWFLAKE_USERNAME" \
             --password "$SNOWFLAKE_PASSWORD" \
             --role "$SNOWFLAKE_ROLE" \
