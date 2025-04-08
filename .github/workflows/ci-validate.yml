@@ -1,4 +1,4 @@
-name: snowflake-ci-pipeline
+name: Snowflake CI Pipeline (STAGE)
 
 on:
   push:
@@ -22,28 +22,28 @@ jobs:
         with:
           python-version: 3.11
 
-      - name: Run schemachange with CLI flags (no TOML)
+      - name: Run schemachange with CLI flags
         env:
           SF_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
           SF_USERNAME: ${{ secrets.SNOWFLAKE_USER }}
+          SF_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
           SF_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
           SF_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
           SF_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
           SF_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
-          SF_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
         run: |
-          echo "Step 1: Installing schemachange"
+          echo "Step 1: Install schemachange"
           pip install schemachange
 
-          echo "Step 2: Running schemachange with CLI flags"
+          echo "Step 2: Run schemachange using CLI flags"
           schemachange \
             -f sql \
             -a "$SF_ACCOUNT" \
             -u "$SF_USERNAME" \
+            -p "$SF_PASSWORD" \
             -r "$SF_ROLE" \
             -w "$SF_WAREHOUSE" \
             -d "$SF_DATABASE" \
             -s "$SF_SCHEMA" \
             -c "$SF_DATABASE.SCHEMACHANGE.CHANGE_HISTORY" \
             --create-change-history-table
-      
