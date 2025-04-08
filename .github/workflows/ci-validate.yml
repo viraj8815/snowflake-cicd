@@ -1,4 +1,4 @@
-name: Snowflake CI Pipeline (STAGE - CLI FLAGS)
+name: Snowflake CI Pipeline (STAGE - auto deploy)
 
 on:
   push:
@@ -6,11 +6,11 @@ on:
       - stage
 
 jobs:
-  deploy-snowflake-changes:
+  deploy-to-stage:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v3
 
       - name: Set up Python
@@ -21,13 +21,10 @@ jobs:
       - name: Install schemachange
         run: pip install schemachange
 
-      - name: Run schemachange using CLI flags (password as env var)
+      - name: Run schemachange (deploy to STAGE_DB)
         env:
           SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
         run: |
-          pip install schemachange
-
-          # These are passed as CLI flags (all except password)
           schemachange \
             -f sql \
             -a "${{ secrets.SNOWFLAKE_ACCOUNT }}" \
