@@ -46,6 +46,4 @@ jobs:
             -s "$SF_SCHEMA" \
             -c "$SF_DATABASE.SCHEMACHANGE.CHANGE_HISTORY" \
             --create-change-history-table
-
-
-            
+      
