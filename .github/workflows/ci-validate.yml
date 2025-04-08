@@ -1,52 +1,48 @@
-name: Snowflake CI Pipeline (STAGE - FINAL WORKING SECRETS)
+name: snowflake-ci-pipeline
 
 on:
   push:
     branches:
       - stage
+    paths:
+      - 'sql/**'
+
+  workflow_dispatch:
 
 jobs:
-  deploy-to-stage:
+  deploy-snowflake-changes-job:
     runs-on: ubuntu-latest
 
-    env:
-      SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
-      SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
-      SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-      SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
-      SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
-      SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
-      SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
-
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Set up Python
+      - name: Use Python 3.11
         uses: actions/setup-python@v4
         with:
           python-version: 3.11
 
-      - name: Install schemachange
-        run: pip install schemachange
-
-      - name: Create connections.toml from env (safe)
+      - name: Run schemachange with CLI flags (no TOML)
+        env:
+          SF_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SF_USERNAME: ${{ secrets.SNOWFLAKE_USER }}
+          SF_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
+          SF_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+          SF_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
+          SF_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
+          SF_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
         run: |
-          echo "[connections.default]" > connections.toml
-          echo "user = \"$SNOWFLAKE_USER\"" >> connections.toml
-          echo "password = \"$SNOWFLAKE_PASSWORD\"" >> connections.toml
-          echo "account = \"$SNOWFLAKE_ACCOUNT\"" >> connections.toml
-          echo "role = \"$SNOWFLAKE_ROLE\"" >> connections.toml
-          echo "warehouse = \"$SNOWFLAKE_WAREHOUSE\"" >> connections.toml
-          echo "database = \"$SNOWFLAKE_DATABASE\"" >> connections.toml
-          echo "schema = \"$SNOWFLAKE_SCHEMA\"" >> connections.toml
+          echo "Step 1: Installing schemachange"
+          pip install schemachange
 
-      - name: Debug connections.toml (safe)
-        run: |
-          echo "----- connections.toml -----"
-          cat connections.toml | sed 's/password = .*/password = "***"/'
-          echo "----------------------------"
-
-      - name: Run schemachange on STAGE_DB
-        run: |
-          schemachange -f sql --create-change-history-table
+          echo "Step 2: Running schemachange with CLI flags"
+          schemachange \
+            -f sql \
+            -a "$SF_ACCOUNT" \
+            -u "$SF_USERNAME" \
+            -r "$SF_ROLE" \
+            -w "$SF_WAREHOUSE" \
+            -d "$SF_DATABASE" \
+            -s "$SF_SCHEMA" \
+            -c "$SF_DATABASE.SCHEMACHANGE.CHANGE_HISTORY" \
+            --create-change-history-table
