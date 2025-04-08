@@ -21,8 +21,8 @@ jobs:
       - name: Install SQLFluff
         run: pip install sqlfluff
 
-      - name: Lint SQL Files
-        run: sqlfluff lint sql/
+      - name: Lint SQL Files (Snowflake Dialect)
+        run: sqlfluff lint sql/ --dialect snowflake
 
       - name: Install SnowSQL
         run: |
