@@ -35,3 +35,5 @@ jobs:
             --database "$SNOWFLAKE_DATABASE" \
             --schema "$SNOWFLAKE_SCHEMA" \
             --query "SELECT CURRENT_TIMESTAMP;"
+
+            
