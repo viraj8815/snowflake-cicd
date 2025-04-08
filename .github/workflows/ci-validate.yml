@@ -1,4 +1,4 @@
-name: Snowflake CI Pipeline (STAGE)
+name: Snowflake CI Pipeline (STAGE - CLI FLAGS)
 
 on:
   push:
@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v3
 
       - name: Set up Python
@@ -21,31 +21,20 @@ jobs:
       - name: Install schemachange
         run: pip install schemachange
 
-      - name: Create connections.toml from GitHub Secrets
+      - name: Run schemachange using CLI flags (password as env var)
         env:
-          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
           SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
-          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
-          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
-          SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
-          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
         run: |
-          echo "[connections.default]" > connections.toml
-          echo "user = \"$SNOWFLAKE_USER\"" >> connections.toml
-          echo "password = \"$SNOWFLAKE_PASSWORD\"" >> connections.toml
-          echo "account = \"$SNOWFLAKE_ACCOUNT\"" >> connections.toml
-          echo "role = \"$SNOWFLAKE_ROLE\"" >> connections.toml
-          echo "warehouse = \"$SNOWFLAKE_WAREHOUSE\"" >> connections.toml
-          echo "database = \"$SNOWFLAKE_DATABASE\"" >> connections.toml
-          echo "schema = \"$SNOWFLAKE_SCHEMA\"" >> connections.toml
+          pip install schemachange
 
-      - name: Show connections.toml (for debug, masks password)
-        run: |
-          echo "-------- connections.toml --------"
-          cat connections.toml | sed 's/password = .*/password = "***"/'
-          echo "----------------------------------"
-
-      - name: Run schemachange deployment
-        run: |
-          schemachange -f sql --create-change-history-table
+          # These are passed as CLI flags (all except password)
+          schemachange \
+            -f sql \
+            -a "${{ secrets.SNOWFLAKE_ACCOUNT }}" \
+            -u "${{ secrets.SNOWFLAKE_USER }}" \
+            -r "${{ secrets.SNOWFLAKE_ROLE }}" \
+            -w "${{ secrets.SNOWFLAKE_WAREHOUSE }}" \
+            -d "${{ secrets.SNOWFLAKE_DATABASE }}" \
+            -s "${{ secrets.SNOWFLAKE_SCHEMA }}" \
+            -c "${{ secrets.SNOWFLAKE_DATABASE }}.SCHEMACHANGE.CHANGE_HISTORY" \
+            --create-change-history-table
