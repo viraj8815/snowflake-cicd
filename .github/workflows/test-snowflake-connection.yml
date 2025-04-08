@@ -15,7 +15,7 @@ jobs:
         run: |
           pip install snowflake-cli-labs
 
-      - name: Test Snowflake Login via CLI
+      - name: Set up Snowflake connection profile
         env:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWSQL_ACCOUNT }}
           SNOWFLAKE_USERNAME: ${{ secrets.SNOWSQL_USER }}
@@ -25,14 +25,16 @@ jobs:
           SNOWFLAKE_DATABASE: ${{ secrets.SNOWSQL_DATABASE_STAGE }}
           SNOWFLAKE_SCHEMA: ${{ secrets.SNOWSQL_SCHEMA }}
         run: |
-          echo "⏳ Connecting to Snowflake..."
-          snow sql --query "SELECT CURRENT_TIMESTAMP;" \
-            --connection '{
-              "account": "'"$SNOWFLAKE_ACCOUNT"'",
-              "username": "'"$SNOWFLAKE_USERNAME"'",
-              "password": "'"$SNOWFLAKE_PASSWORD"'",
-              "role": "'"$SNOWFLAKE_ROLE"'",
-              "warehouse": "'"$SNOWFLAKE_WAREHOUSE"'",
-              "database": "'"$SNOWFLAKE_DATABASE"'",
-              "schema": "'"$SNOWFLAKE_SCHEMA"'"
-            }'
+          snow connection init github-test \
+            --account "$SNOWFLAKE_ACCOUNT" \
+            --username "$SNOWFLAKE_USERNAME" \
+            --password "$SNOWFLAKE_PASSWORD" \
+            --role "$SNOWFLAKE_ROLE" \
+            --warehouse "$SNOWFLAKE_WAREHOUSE" \
+            --database "$SNOWFLAKE_DATABASE" \
+            --schema "$SNOWFLAKE_SCHEMA"
+
+      - name: Test Snowflake connection
+        run: |
+          echo "⏳ Running test query..."
+          snow sql --connection github-test --query "SELECT CURRENT_TIMESTAMP;"
