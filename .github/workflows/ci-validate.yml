@@ -1,4 +1,4 @@
-name: Snowflake CI Pipeline (STAGE - FINAL TEST)
+name: Snowflake CI Pipeline (STAGE - FINAL FIX)
 
 on:
   push:
@@ -21,7 +21,7 @@ jobs:
       - name: Install schemachange
         run: pip install schemachange
 
-      - name: Set hardcoded env vars and run schemachange
+      - name: Set env vars and run schemachange
         env:
           SNOWFLAKE_USER: VIRAJVJ8815
           SNOWFLAKE_PASSWORD: Viraj@1234567890
@@ -32,13 +32,13 @@ jobs:
           SNOWFLAKE_SCHEMA: PUBLIC
         run: |
           echo "[connections.default]" > connections.toml
-          echo "user = '${SNOWFLAKE_USER}'" >> connections.toml
-          echo "password = '${SNOWFLAKE_PASSWORD}'" >> connections.toml
-          echo "account = '${SNOWFLAKE_ACCOUNT}'" >> connections.toml
-          echo "role = '${SNOWFLAKE_ROLE}'" >> connections.toml
-          echo "warehouse = '${SNOWFLAKE_WAREHOUSE}'" >> connections.toml
-          echo "database = '${SNOWFLAKE_DATABASE}'" >> connections.toml
-          echo "schema = '${SNOWFLAKE_SCHEMA}'" >> connections.toml
+          echo "user = ${SNOWFLAKE_USER}" >> connections.toml
+          echo "password = ${SNOWFLAKE_PASSWORD}" >> connections.toml
+          echo "account = ${SNOWFLAKE_ACCOUNT}" >> connections.toml
+          echo "role = ${SNOWFLAKE_ROLE}" >> connections.toml
+          echo "warehouse = ${SNOWFLAKE_WAREHOUSE}" >> connections.toml
+          echo "database = ${SNOWFLAKE_DATABASE}" >> connections.toml
+          echo "schema = ${SNOWFLAKE_SCHEMA}" >> connections.toml
 
           echo "----- connections.toml -----"
           cat connections.toml | sed 's/password = .*/password = "***"/'
