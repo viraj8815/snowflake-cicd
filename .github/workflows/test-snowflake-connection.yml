@@ -14,23 +14,25 @@ jobs:
       - name: Install Snowflake CLI
         run: pip install snowflake-cli-labs
 
-      - name: Test Snowflake Login with ENV vars
+      - name: Test Snowflake Login via CLI
         env:
-          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWSQL_ACCOUNT }}
-          SNOWFLAKE_USER: ${{ secrets.SNOWSQL_USER }}
-          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWSQL_PWD }}
-          SNOWFLAKE_ROLE: ${{ secrets.SNOWSQL_ROLE }}
-          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWSQL_WAREHOUSE }}
-          SNOWFLAKE_DATABASE: ${{ secrets.SNOWSQL_DATABASE_STAGE }}
-          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWSQL_SCHEMA }}
+          ACCOUNT: ${{ secrets.SNOWSQL_ACCOUNT }}
+          USERNAME: ${{ secrets.SNOWSQL_USER }}
+          PASSWORD: ${{ secrets.SNOWSQL_PWD }}
+          ROLE: ${{ secrets.SNOWSQL_ROLE }}
+          WAREHOUSE: ${{ secrets.SNOWSQL_WAREHOUSE }}
+          DATABASE: ${{ secrets.SNOWSQL_DATABASE_STAGE }}
+          SCHEMA: ${{ secrets.SNOWSQL_SCHEMA }}
         run: |
-          echo "⏳ Running test query..."
+          echo "⏳ Running test query with inline connection..."
           snow sql \
-            --account "$SNOWFLAKE_ACCOUNT" \
-            --username "$SNOWFLAKE_USER" \
-            --password "$SNOWFLAKE_PASSWORD" \
-            --role "$SNOWFLAKE_ROLE" \
-            --warehouse "$SNOWFLAKE_WAREHOUSE" \
-            --database "$SNOWFLAKE_DATABASE" \
-            --schema "$SNOWFLAKE_SCHEMA" \
+            --connection '{
+              "account": "'"$ACCOUNT"'",
+              "username": "'"$USERNAME"'",
+              "password": "'"$PASSWORD"'",
+              "role": "'"$ROLE"'",
+              "warehouse": "'"$WAREHOUSE"'",
+              "database": "'"$DATABASE"'",
+              "schema": "'"$SCHEMA"'"
+            }' \
             --query "SELECT CURRENT_TIMESTAMP;"
