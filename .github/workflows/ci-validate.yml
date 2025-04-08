@@ -1,4 +1,4 @@
-name: CI - Deploy to STAGE using schemachange
+name: Snowflake CI Pipeline (Stage)
 
 on:
   push:
@@ -6,29 +6,32 @@ on:
       - stage
 
 jobs:
-  deploy:
+  deploy-to-stage:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
 
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
+          python-version: 3.11
 
       - name: Install schemachange
         run: pip install schemachange
 
-      - name: Deploy to Snowflake STAGE using schemachange
+      - name: Create connections.toml
         run: |
-          schemachange -f sql/scripts \
-            -a ${{ secrets.SNOWSQL_ACCOUNT }} \
-            -u ${{ secrets.SNOWSQL_USER }} \
-            -r ${{ secrets.SNOWSQL_ROLE }} \
-            -w ${{ secrets.SNOWSQL_WAREHOUSE }} \
-            -d ${{ secrets.SNOWSQL_DATABASE_STAGE }} \
-            -c STAGE_CHANGE_HISTORY \
-            -s ${{ secrets.SNOWSQL_SCHEMA }}
-        env:
-          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWSQL_PWD }}
+          echo "[connections.default]" > connections.toml
+          echo "user = '${{ secrets.SNOWFLAKE_USER }}'" >> connections.toml
+          echo "password = '${{ secrets.SNOWFLAKE_PASSWORD }}'" >> connections.toml
+          echo "account = '${{ secrets.SNOWFLAKE_ACCOUNT }}'" >> connections.toml
+          echo "role = '${{ secrets.SNOWFLAKE_ROLE }}'" >> connections.toml
+          echo "warehouse = '${{ secrets.SNOWFLAKE_WAREHOUSE }}'" >> connections.toml
+          echo "database = 'STAGE_DB'" >> connections.toml
+          echo "schema = 'PUBLIC'" >> connections.toml
+
+      - name: Run schemachange on STAGE_DB
+        run: |
+          schemachange -f sql --create-change-history-table
