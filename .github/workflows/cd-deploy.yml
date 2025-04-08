@@ -1,4 +1,4 @@
-name: CD - Snowflake Deployment
+name: CD - Deploy to Prod
 
 on:
   push:
@@ -10,21 +10,27 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
+      - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Install schemachange
-        run: pip install schemachange
-
-      - name: Deploy to Snowflake (Prod)
+      - name: Install SnowSQL
         run: |
-          schemachange -f sql/ \
+          sudo apt-get update
+          sudo apt-get install -y unzip
+          curl -O https://sfc-repo.snowflakecomputing.com/snowsql/bootstrap/1.2/linux_x86_64/snowsql-linux_x86_64.zip
+          unzip snowsql-linux_x86_64.zip
+          ./snowsql-linux_x86_64/install
+          export PATH=$PATH:$PWD/snowsql-linux_x86_64
+
+      - name: Deploy SQL to Snowflake Prod DB
+        run: |
+          ./snowsql-linux_x86_64/snowsql \
             -a ${{ secrets.SNOWSQL_ACCOUNT }} \
             -u ${{ secrets.SNOWSQL_USER }} \
             -r ${{ secrets.SNOWSQL_ROLE }} \
             -w ${{ secrets.SNOWSQL_WAREHOUSE }} \
             -d ${{ secrets.SNOWSQL_DATABASE_PROD }} \
-            -c CHANGE_HISTORY \
-            -s ${{ secrets.SNOWSQL_SCHEMA }}
+            -s ${{ secrets.SNOWSQL_SCHEMA }} \
+            -f .github/workflows/prod_deploy.sql
         env:
-          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWSQL_PWD }}
+          SNOWSQL_PWD: ${{ secrets.SNOWSQL_PWD }}

@@ -1,4 +1,4 @@
-name: CI - SQL Validation
+name: CI - Deploy to Stage
 
 on:
   push:
@@ -6,23 +6,12 @@ on:
       - stage
 
 jobs:
-  validate-sql:
+  deploy-to-stage:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
+      - name: Checkout code
         uses: actions/checkout@v3
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-
-      - name: Install SQLFluff
-        run: pip install sqlfluff
-
-      - name: Lint SQL Files (Snowflake Dialect)
-        run: sqlfluff lint sql/ --dialect snowflake
 
       - name: Install SnowSQL
         run: |
@@ -33,7 +22,7 @@ jobs:
           ./snowsql-linux_x86_64/install
           export PATH=$PATH:$PWD/snowsql-linux_x86_64
 
-      - name: Validate SQL Files with SnowSQL
+      - name: Deploy SQL to Snowflake Stage DB
         run: |
           ./snowsql-linux_x86_64/snowsql \
             -a ${{ secrets.SNOWSQL_ACCOUNT }} \
