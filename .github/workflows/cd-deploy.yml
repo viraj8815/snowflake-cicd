@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v3
 
       - name: Set up Python
@@ -24,14 +24,14 @@ jobs:
       - name: Create connections.toml
         run: |
           echo "[connections.default]" > connections.toml
-          echo "user = '${{ secrets.SNOWFLAKE_USER }}'" >> connections.toml
-          echo "password = '${{ secrets.SNOWFLAKE_PASSWORD }}'" >> connections.toml
-          echo "account = '${{ secrets.SNOWFLAKE_ACCOUNT }}'" >> connections.toml
-          echo "role = '${{ secrets.SNOWFLAKE_ROLE }}'" >> connections.toml
-          echo "warehouse = '${{ secrets.SNOWFLAKE_WAREHOUSE }}'" >> connections.toml
-          echo "database = 'PROD_DB'" >> connections.toml
-          echo "schema = 'PUBLIC'" >> connections.toml
+          echo "user = '${{ secrets.SNOWSQL_USER }}'" >> connections.toml
+          echo "password = '${{ secrets.SNOWSQL_PWD }}'" >> connections.toml
+          echo "account = '${{ secrets.SNOWSQL_ACCOUNT }}'" >> connections.toml
+          echo "role = '${{ secrets.SNOWSQL_ROLE }}'" >> connections.toml
+          echo "warehouse = '${{ secrets.SNOWSQL_WAREHOUSE }}'" >> connections.toml
+          echo "database = '${{ secrets.SNOWSQL_DATABASE_PROD }}'" >> connections.toml
+          echo "schema = '${{ secrets.SNOWSQL_SCHEMA }}'" >> connections.toml
 
-      - name: Run schemachange on PROD_DB
+      - name: Run schemachange (PROD_DB)
         run: |
           schemachange -f sql --create-change-history-table
