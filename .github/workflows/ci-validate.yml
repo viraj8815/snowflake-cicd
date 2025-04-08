@@ -6,40 +6,46 @@ on:
       - stage
 
 jobs:
-  deploy-snowflake-changes-job:
+  deploy-snowflake-changes:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Use Python 3.11
+      - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: 3.11
 
-      - name: Run schemachange with CLI flags
-        env:
-          SF_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SF_USERNAME: ${{ secrets.SNOWFLAKE_USER }}
-          SF_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
-          SF_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
-          SF_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
-          SF_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
-          SF_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
-        run: |
-          echo "Step 1: Install schemachange"
-          pip install schemachange
+      - name: Install schemachange
+        run: pip install schemachange
 
-          echo "Step 2: Run schemachange using CLI flags"
-          schemachange \
-            -f sql \
-            -a "$SF_ACCOUNT" \
-            -u "$SF_USERNAME" \
-            -p "$SF_PASSWORD" \
-            -r "$SF_ROLE" \
-            -w "$SF_WAREHOUSE" \
-            -d "$SF_DATABASE" \
-            -s "$SF_SCHEMA" \
-            -c "$SF_DATABASE.SCHEMACHANGE.CHANGE_HISTORY" \
-            --create-change-history-table
+      - name: Create connections.toml from GitHub Secrets
+        env:
+          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
+          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+          SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
+          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
+        run: |
+          echo "[connections.default]" > connections.toml
+          echo "user = \"$SNOWFLAKE_USER\"" >> connections.toml
+          echo "password = \"$SNOWFLAKE_PASSWORD\"" >> connections.toml
+          echo "account = \"$SNOWFLAKE_ACCOUNT\"" >> connections.toml
+          echo "role = \"$SNOWFLAKE_ROLE\"" >> connections.toml
+          echo "warehouse = \"$SNOWFLAKE_WAREHOUSE\"" >> connections.toml
+          echo "database = \"$SNOWFLAKE_DATABASE\"" >> connections.toml
+          echo "schema = \"$SNOWFLAKE_SCHEMA\"" >> connections.toml
+
+      - name: Show connections.toml (for debug, masks password)
+        run: |
+          echo "-------- connections.toml --------"
+          cat connections.toml | sed 's/password = .*/password = "***"/'
+          echo "----------------------------------"
+
+      - name: Run schemachange deployment
+        run: |
+          schemachange -f sql --create-change-history-table
