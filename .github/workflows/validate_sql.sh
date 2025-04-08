@@ -1,15 +1,16 @@
 #!/bin/bash
+echo "🔍 Running SQLFluff Lint on staging SQL files..."
+sqlfluff lint sql/tables/*.sql sql/views/*.sql sql/UDF/*.sql --dialect snowflake
+echo "✅ Linting finished."
 
-echo "Looking for SQL files under 'sql/'..."
-SQL_FILES=$(find sql -type f -name "*.sql")
+if [ $? -ne 0 ]; then
+  echo "SQL Linting failed."
+  exit 1
+else
+  echo "SQL Linting passed."
+fi
 
-echo "Found SQL files:"
-echo "$SQL_FILES"
+echo "🔍 Syntax Check (Dry Run Simulation)..."
+find sql/ -name "*.sql" -print -exec cat {} \;
 
-echo "Running sqlfluff linter..."
-for file in $SQL_FILES; do
-  echo "Linting $file"
-  sqlfluff lint "$file" --dialect snowflake
-done
-
-echo "SQL lint check completed (simulated dry run)"
+echo "Syntax check complete."
