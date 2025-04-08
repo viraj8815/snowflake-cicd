@@ -4,10 +4,6 @@ on:
   push:
     branches:
       - stage
-    paths:
-      - 'sql/**'
-
-  workflow_dispatch:
 
 jobs:
   deploy-snowflake-changes-job:
