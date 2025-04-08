@@ -4,35 +4,38 @@ on:
   workflow_dispatch:
 
 jobs:
-  test-connection:
+  test-snowflake-connection:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
+      - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Install Snowflake CLI
-        run: pip install snowflake-cli-labs
-
-      - name: Test Snowflake Login via CLI
-        env:
-          ACCOUNT: ${{ secrets.SNOWSQL_ACCOUNT }}
-          USERNAME: ${{ secrets.SNOWSQL_USER }}
-          PASSWORD: ${{ secrets.SNOWSQL_PWD }}
-          ROLE: ${{ secrets.SNOWSQL_ROLE }}
-          WAREHOUSE: ${{ secrets.SNOWSQL_WAREHOUSE }}
-          DATABASE: ${{ secrets.SNOWSQL_DATABASE_STAGE }}
-          SCHEMA: ${{ secrets.SNOWSQL_SCHEMA }}
+      - name: Set up Python and install Snowflake CLI
         run: |
-          echo "⏳ Running test query with inline connection..."
+          python3 -m pip install --upgrade pip
+          pip install snowflake-cli-labs
+
+      - name: Run test query using snow CLI
+        env:
+          SF_ACCOUNT: ${{ secrets.SNOWSQL_ACCOUNT }}
+          SF_USERNAME: ${{ secrets.SNOWSQL_USER }}
+          SF_PASSWORD: ${{ secrets.SNOWSQL_PWD }}
+          SF_ROLE: ${{ secrets.SNOWSQL_ROLE }}
+          SF_WAREHOUSE: ${{ secrets.SNOWSQL_WAREHOUSE }}
+          SF_DATABASE: ${{ secrets.SNOWSQL_DATABASE_STAGE }}
+          SF_SCHEMA: ${{ secrets.SNOWSQL_SCHEMA }}
+        run: |
+          echo "SELECT CURRENT_TIMESTAMP;" > test.sql
+
           snow sql \
             --connection '{
-              "account": "'"$ACCOUNT"'",
-              "username": "'"$USERNAME"'",
-              "password": "'"$PASSWORD"'",
-              "role": "'"$ROLE"'",
-              "warehouse": "'"$WAREHOUSE"'",
-              "database": "'"$DATABASE"'",
-              "schema": "'"$SCHEMA"'"
+              "account": "'"$SF_ACCOUNT"'",
+              "username": "'"$SF_USERNAME"'",
+              "password": "'"$SF_PASSWORD"'",
+              "role": "'"$SF_ROLE"'",
+              "warehouse": "'"$SF_WAREHOUSE"'",
+              "database": "'"$SF_DATABASE"'",
+              "schema": "'"$SF_SCHEMA"'"
             }' \
-            --query "SELECT CURRENT_TIMESTAMP;"
+            --filename test.sql
