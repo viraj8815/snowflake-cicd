@@ -48,22 +48,4 @@ jobs:
             -c "${{ secrets.SNOWFLAKE_DATABASE }}.SCHEMACHANGE.CHANGE_HISTORY" \
             --create-change-history-table
 
-  create-pr:
-    needs: deploy-to-stage
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Create PR from stage to main
-        uses: peter-evans/create-pull-request@v5
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          base: main
-          branch: stage
-          title: "Auto PR: Promote changes from STAGE to PROD"
-          body: |
-            CI passed successfully on `stage`  
-            This PR promotes latest tested SQL changes to `main`  
-            Merging this will trigger CD deployment to `PROD_DB`
+  
