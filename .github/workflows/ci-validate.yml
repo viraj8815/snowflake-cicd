@@ -1,4 +1,4 @@
-name: Snowflake CI Pipeline (STAGE - Auto Deploy)
+name: Snowflake CI Pipeline (STAGE - Auto Deploy + PR)
 
 on:
   push:
@@ -23,7 +23,7 @@ jobs:
           pip install schemachange
           pip install sqlfluff
 
-      - name: Add SQLFluff config to ignore casing rules
+      - name: Add SQLFluff config to ignore casing and indent rules
         run: |
           echo "[sqlfluff]" > .sqlfluff
           echo "dialect = snowflake" >> .sqlfluff
@@ -47,3 +47,5 @@ jobs:
             -s "${{ secrets.SNOWFLAKE_SCHEMA }}" \
             -c "${{ secrets.SNOWFLAKE_DATABASE }}.SCHEMACHANGE.CHANGE_HISTORY" \
             --create-change-history-table
+
+  
