@@ -5,6 +5,8 @@ on:
     branches:
       - stage
 
+  workflow_dispatch:
+
 jobs:
   deploy-to-stage:
     runs-on: ubuntu-latest
