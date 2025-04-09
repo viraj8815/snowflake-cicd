@@ -1,4 +1,4 @@
-name: Snowflake CI Pipeline (STAGE - auto deploy & PR)
+name: Snowflake CI Pipeline (STAGE - Auto Deploy + PR)
 
 on:
   push:
@@ -18,15 +18,22 @@ jobs:
         with:
           python-version: 3.11
 
-      - name: Install schemachange and sqlfluff
+      - name: Install dependencies
         run: |
-          pip install schemachange sqlfluff
+          pip install schemachange
+          pip install sqlfluff
 
-      - name: SQL Lint (Ignore casing only)
+      - name: Add SQLFluff config to ignore casing and indent rules
         run: |
-          sqlfluff lint sql/ --exclude-rules=LT01
+          echo "[sqlfluff]" > .sqlfluff
+          echo "dialect = snowflake" >> .sqlfluff
+          echo "exclude_rules = L010,L014,LT02" >> .sqlfluff
 
-      - name: Deploy to STAGE using schemachange
+      - name: Run SQLFluff lint
+        run: |
+          sqlfluff lint sql/
+
+      - name: Deploy to STAGE_DB using schemachange
         env:
           SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
         run: |
