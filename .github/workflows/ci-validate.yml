@@ -1,4 +1,4 @@
-name: Snowflake CI Pipeline (STAGE - Auto Deploy + PR)
+name: Snowflake CI Pipeline (STAGE - auto deploy & PR)
 
 on:
   push:
@@ -18,22 +18,15 @@ jobs:
         with:
           python-version: 3.11
 
-      - name: Install dependencies
+      - name: Install schemachange and sqlfluff
         run: |
-          pip install schemachange
-          pip install sqlfluff
+          pip install schemachange sqlfluff
 
-      - name: Add SQLFluff config to ignore casing and indent rules
+      - name: SQL Lint (Ignore casing only)
         run: |
-          echo "[sqlfluff]" > .sqlfluff
-          echo "dialect = snowflake" >> .sqlfluff
-          echo "exclude_rules = L010,L014,LT02" >> .sqlfluff
+          sqlfluff lint sql/ --exclude-rules=LT01
 
-      - name: Run SQLFluff lint
-        run: |
-          sqlfluff lint sql/
-
-      - name: Deploy to STAGE_DB using schemachange
+      - name: Deploy to STAGE using schemachange
         env:
           SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
         run: |
@@ -48,4 +41,30 @@ jobs:
             -c "${{ secrets.SNOWFLAKE_DATABASE }}.SCHEMACHANGE.CHANGE_HISTORY" \
             --create-change-history-table
 
-  
+      - name: Auto-commit any SQL changes (if needed)
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add sql/
+          git diff-index --quiet HEAD || git commit -m "Auto-commit: Add or update SQL migration files"
+          git push origin stage
+
+  create-pr:
+    needs: deploy-to-stage
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Create PR from stage to main
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          base: main
+          branch: stage
+          title: "Auto PR: Promote changes from STAGE to PROD"
+          body: |
+            CI passed on `stage`  
+            This PR promotes the latest SQL changes to `main`  
+            Merging this will trigger deployment to `PROD_DB`
