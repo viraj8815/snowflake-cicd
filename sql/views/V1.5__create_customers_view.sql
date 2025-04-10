@@ -1,12 +1,15 @@
-CREATE OR REPLACE VIEW STAGE_DB.PUBLIC.CUSTOMERS_VIEW AS
+CREATE OR REPLACE VIEW CUSTOMERS_VIEW AS
 SELECT
-"customerid",
-"companyname",
-"contactname",
-"contacttitle",
-"address",
-"city",
-"region",
-"postalcode",
-"country"
+  CUSTOMERID,
+  COMPANYNAME,
+  CONTACTNAME,
+  CONTACTTITLE,
+  ADDRESS,
+  CITY,
+  REGION,
+  POSTALCODE,
+  COUNTRY,
+  PHONE,
+  FAX
 FROM STAGE_DB.PUBLIC.CUSTOMERS;
+
