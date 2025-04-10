@@ -8,5 +8,5 @@ SELECT
 "city",
 "region",
 "postalcode",
-"country",
+"country"
 FROM STAGE_DB.PUBLIC.CUSTOMERS;
