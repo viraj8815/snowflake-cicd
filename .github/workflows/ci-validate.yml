@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Set up Python
@@ -21,9 +21,10 @@ jobs:
       - name: Install schemachange
         run: pip install schemachange
 
-      - name: Create hardcoded connections.toml
+      - name: Create .schemachange/connections.toml
         run: |
-          cat <<EOF > connections.toml
+          mkdir -p .schemachange
+          cat <<EOF > .schemachange/connections.toml
           [snowflake_connection]
           account = 'gszncrk-nvb75074'
           user = 'virajcom1'
@@ -34,10 +35,9 @@ jobs:
           schema = 'PUBLIC'
           EOF
 
-      - name: Debug Print connections.toml
-        run: cat connections.toml
+      - name: Debug: Print connections.toml (optional)
+        run: cat .schemachange/connections.toml
 
       - name: Validate SQL Changes (Dry Run)
         run: |
           schemachange deploy -f sql/ --create-change-history-table --connection-name snowflake_connection
-
