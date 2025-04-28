@@ -36,4 +36,4 @@ jobs:
           SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
         run: |
           echo "Deploying Snowflake changes..."
-          schemachange -f sql/ --create-change-history-table --connection-name snowflake_connection
+          schemachange -f sql/ --create-change-history-table
