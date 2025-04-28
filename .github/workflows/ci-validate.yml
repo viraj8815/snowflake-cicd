@@ -23,16 +23,18 @@ jobs:
 
       - name: Create hardcoded connections.toml
         run: |
-          echo "[snowflake_connection]" > connections.toml
-          echo "account = 'gszncrk-nvb75074'" >> connections.toml
-          echo "user = 'virajcom1'" >> connections.toml
-          echo "password = 'Viraj@1234567890'" >> connections.toml
-          echo "role = 'accountadmin'" >> connections.toml
-          echo "warehouse = 'compute_wh'" >> connections.toml
-          echo "database = 'STAGE_DB'" >> connections.toml
-          echo "schema = 'PUBLIC'" >> connections.toml
+          cat <<EOF > connections.toml
+          [snowflake_connection]
+          account = 'gszncrk-nvb75074'
+          user = 'virajcom1'
+          password = 'Viraj@1234567890'
+          role = 'accountadmin'
+          warehouse = 'compute_wh'
+          database = 'STAGE_DB'
+          schema = 'PUBLIC'
+          EOF
 
-      - name: Print connections.toml (Optional for Debugging)
+      - name: Debug: Print connections.toml
         run: cat connections.toml
 
       - name: Validate SQL Changes (Dry Run)
