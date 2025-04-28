@@ -35,14 +35,16 @@ jobs:
 
       - name: Create connections.toml
         run: |
-          echo "[snowflake_connection]" > connections.toml
-          echo "account = \"${{ secrets.SNOWFLAKE_ACCOUNT }}\"" >> connections.toml
-          echo "user = \"${{ secrets.SNOWFLAKE_USER }}\"" >> connections.toml
-          echo "password = \"${{ secrets.SNOWFLAKE_PASSWORD }}\"" >> connections.toml
-          echo "role = \"${{ secrets.SNOWFLAKE_ROLE }}\"" >> connections.toml
-          echo "warehouse = \"${{ secrets.SNOWFLAKE_WAREHOUSE }}\"" >> connections.toml
-          echo "database = \"${{ secrets.SNOWFLAKE_DATABASE_STAGE }}\"" >> connections.toml
-          echo "schema = \"${{ secrets.SNOWFLAKE_SCHEMA }}\"" >> connections.toml
+          cat <<EOF > connections.toml
+          [snowflake_connection]
+          account = "${{ secrets.SNOWFLAKE_ACCOUNT }}"
+          user = "${{ secrets.SNOWFLAKE_USER }}"
+          password = "${{ secrets.SNOWFLAKE_PASSWORD }}"
+          role = "${{ secrets.SNOWFLAKE_ROLE }}"
+          warehouse = "${{ secrets.SNOWFLAKE_WAREHOUSE }}"
+          database = "${{ secrets.SNOWFLAKE_DATABASE_STAGE }}"
+          schema = "${{ secrets.SNOWFLAKE_SCHEMA }}"
+          EOF
 
       - name: Debug connections.toml
         run: |
@@ -52,12 +54,12 @@ jobs:
       - name: Verify Secrets Before Deployment
         run: |
           check_secret() {
-            if [ -z "$1" ]; then
-              echo "❌ $2 is MISSING or EMPTY"
-              exit 1
-            else
-              echo "✅ $2 is OK"
-            fi
+              if [ -z "$1" ]; then
+                  echo "❌ $2 is MISSING or EMPTY"
+                  exit 1
+              else
+                  echo "✅ $2 is OK"
+              fi
           }
 
           echo "🔍 Checking GitHub Secrets..."
