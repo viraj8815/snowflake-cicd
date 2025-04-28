@@ -40,4 +40,4 @@ jobs:
 
       - name: Validate SQL Changes (Dry Run)
         run: |
-          schemachange deploy -f sql/ --create-change-history-table --connection-name snowflake_connection
+          schemachange deploy -f sql/ --create-change-history-table --connection-name snowflake_connection --config-folder .schemachange
