@@ -23,7 +23,7 @@ jobs:
           pip install schemachange
           pip install sqlfluff
 
-      - name: Add SQLFluff config
+      - name: Add SQLFluff config to ignore casing and indent rules
         run: |
           echo "[sqlfluff]" > .sqlfluff
           echo "dialect = snowflake" >> .sqlfluff
@@ -33,33 +33,28 @@ jobs:
         run: |
           sqlfluff lint sql/
 
-      - name: Create ~/.snowflake/connections.toml
+      - name: Create connections.toml file
         run: |
           mkdir -p ~/.snowflake
-          cat <<EOF > ~/.snowflake/connections.toml
-          [connections]
-
-          [connections.connections]
-          type = "snowflake"
-          account = "${{ secrets.SNOWFLAKE_ACCOUNT }}"
-          user = "${{ secrets.SNOWFLAKE_USER }}"
-          password = "${{ secrets.SNOWFLAKE_PASSWORD }}"
-          role = "${{ secrets.SNOWFLAKE_ROLE }}"
-          warehouse = "${{ secrets.SNOWFLAKE_WAREHOUSE }}"
-          database = "${{ secrets.SNOWFLAKE_DATABASE_STAGE }}"
-          schema = "${{ secrets.SNOWFLAKE_SCHEMA }}"
-          EOF
+          echo "[connections]" > ~/.snowflake/connections.toml
+          echo "account = \"${{ secrets.SNOWFLAKE_ACCOUNT }}\"" >> ~/.snowflake/connections.toml
+          echo "user = \"${{ secrets.SNOWFLAKE_USER }}\"" >> ~/.snowflake/connections.toml
+          echo "password = \"${{ secrets.SNOWFLAKE_PASSWORD }}\"" >> ~/.snowflake/connections.toml
+          echo "role = \"${{ secrets.SNOWFLAKE_ROLE }}\"" >> ~/.snowflake/connections.toml
+          echo "warehouse = \"${{ secrets.SNOWFLAKE_WAREHOUSE }}\"" >> ~/.snowflake/connections.toml
+          echo "database = \"${{ secrets.SNOWFLAKE_DATABASE_STAGE }}\"" >> ~/.snowflake/connections.toml
+          echo "schema = \"${{ secrets.SNOWFLAKE_SCHEMA }}\"" >> ~/.snowflake/connections.toml
           chmod 0600 ~/.snowflake/connections.toml
 
-      - name: Show connections.toml contents (for debug, optional)
+      - name: Show connections.toml contents
         run: |
-          cat ~/.snowflake/connections.toml
+          cat ~/.snowflake/connections.toml # Debug: Show file content
 
       - name: Deploy to STAGE_DB using schemachange
         run: |
-          schemachange deploy \
+          schemachange \
             -f sql \
             --connection-name connections \
-            --config-folder ~/.snowflake \
-            --change-history-table STAGE_DB.SCHEMACHANGE.CHANGE_HISTORY \
+            --change-history-table "SCHEMACHANGE.CHANGE_HISTORY" \
             --create-change-history-table
+            --dry-run
