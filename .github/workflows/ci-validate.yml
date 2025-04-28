@@ -9,15 +9,6 @@ jobs:
   deploy-to-stage:
     runs-on: ubuntu-latest
 
-    env:
-      SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-      SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
-      SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
-      SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
-      SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
-      SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE_STAGE }}
-      SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -45,15 +36,15 @@ jobs:
       - name: Create connections.toml
         run: |
           echo "[snowflake_connection]" > connections.toml
-          echo "account = $SNOWFLAKE_ACCOUNT" >> connections.toml
-          echo "user = $SNOWFLAKE_USER" >> connections.toml
-          echo "password = $SNOWFLAKE_PASSWORD" >> connections.toml
-          echo "role = $SNOWFLAKE_ROLE" >> connections.toml
-          echo "warehouse = $SNOWFLAKE_WAREHOUSE" >> connections.toml
-          echo "database = $SNOWFLAKE_DATABASE" >> connections.toml
-          echo "schema = $SNOWFLAKE_SCHEMA" >> connections.toml
+          echo "account = '${{ secrets.SNOWFLAKE_ACCOUNT }}'" >> connections.toml
+          echo "user = '${{ secrets.SNOWFLAKE_USER }}'" >> connections.toml
+          echo "password = '${{ secrets.SNOWFLAKE_PASSWORD }}'" >> connections.toml
+          echo "role = '${{ secrets.SNOWFLAKE_ROLE }}'" >> connections.toml
+          echo "warehouse = '${{ secrets.SNOWFLAKE_WAREHOUSE }}'" >> connections.toml
+          echo "database = '${{ secrets.SNOWFLAKE_DATABASE_STAGE }}'" >> connections.toml
+          echo "schema = '${{ secrets.SNOWFLAKE_SCHEMA }}'" >> connections.toml
 
-      - name: Debug connections.toml contents (Optional)
+      - name: Debug connections.toml
         run: |
           cat connections.toml
 
