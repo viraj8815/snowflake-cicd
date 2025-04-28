@@ -1,4 +1,4 @@
-name: Snowflake CI Pipeline (Stage Deployment)
+name: Snowflake CI Pipeline (Stage Deployment - Dry Run)
 
 on:
   push:
@@ -45,23 +45,18 @@ jobs:
       - name: Create connections.toml
         run: |
           echo "[snowflake_connection]" > connections.toml
-          echo "account = '${SNOWFLAKE_ACCOUNT}'" >> connections.toml
-          echo "user = '${SNOWFLAKE_USER}'" >> connections.toml
-          echo "password = '${SNOWFLAKE_PASSWORD}'" >> connections.toml
-          echo "role = '${SNOWFLAKE_ROLE}'" >> connections.toml
-          echo "warehouse = '${SNOWFLAKE_WAREHOUSE}'" >> connections.toml
-          echo "database = '${SNOWFLAKE_DATABASE}'" >> connections.toml
-          echo "schema = '${SNOWFLAKE_SCHEMA}'" >> connections.toml
+          echo "account = $SNOWFLAKE_ACCOUNT" >> connections.toml
+          echo "user = $SNOWFLAKE_USER" >> connections.toml
+          echo "password = $SNOWFLAKE_PASSWORD" >> connections.toml
+          echo "role = $SNOWFLAKE_ROLE" >> connections.toml
+          echo "warehouse = $SNOWFLAKE_WAREHOUSE" >> connections.toml
+          echo "database = $SNOWFLAKE_DATABASE" >> connections.toml
+          echo "schema = $SNOWFLAKE_SCHEMA" >> connections.toml
 
-      - name: Debug connections.toml contents (optional)
+      - name: Debug connections.toml contents (Optional)
         run: |
           cat connections.toml
 
-      - name: Debug environment variables (optional)
+      - name: Perform Dry Run with schemachange
         run: |
-          echo "SNOWFLAKE_USER is $SNOWFLAKE_USER"
-          echo "SNOWFLAKE_ACCOUNT is $SNOWFLAKE_ACCOUNT"
-
-      - name: Deploy changes to STAGE_DB using schemachange
-        run: |
-          schemachange -f sql/ -c snowflake_connection --create-change-history-table
+          schemachange -f sql/ -c snowflake_connection --create-change-history-table --dry-run
