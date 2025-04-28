@@ -15,7 +15,7 @@ jobs:
       SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
       SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
       SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
-      SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE_STAGE }}   # Stage Database
+      SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE_STAGE }}
       SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
 
     steps:
@@ -56,6 +56,11 @@ jobs:
       - name: Debug connections.toml contents (optional)
         run: |
           cat connections.toml
+
+      - name: Debug environment variables (optional)
+        run: |
+          echo "SNOWFLAKE_USER is $SNOWFLAKE_USER"
+          echo "SNOWFLAKE_ACCOUNT is $SNOWFLAKE_ACCOUNT"
 
       - name: Deploy changes to STAGE_DB using schemachange
         run: |
