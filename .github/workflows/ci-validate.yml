@@ -49,28 +49,27 @@ jobs:
           echo "====== Printing connections.toml ======"
           cat connections.toml
 
-          - name: Verify Secrets Before Deployment
-          run: |
-            check_secret() {
-              if [ -z "$1" ]; then
-                echo "❌ $2 is MISSING or EMPTY"
-                exit 1
-              else
-                echo "✅ $2 is OK"
-              fi
-            }
-        
-            echo "🔍 Checking GitHub Secrets..."
-            check_secret "${{ secrets.SNOWFLAKE_ACCOUNT }}" "SNOWFLAKE_ACCOUNT"
-            check_secret "${{ secrets.SNOWFLAKE_USER }}" "SNOWFLAKE_USER"
-            check_secret "${{ secrets.SNOWFLAKE_PASSWORD }}" "SNOWFLAKE_PASSWORD"
-            check_secret "${{ secrets.SNOWFLAKE_ROLE }}" "SNOWFLAKE_ROLE"
-            check_secret "${{ secrets.SNOWFLAKE_WAREHOUSE }}" "SNOWFLAKE_WAREHOUSE"
-            check_secret "${{ secrets.SNOWFLAKE_DATABASE_STAGE }}" "SNOWFLAKE_DATABASE_STAGE"
-            check_secret "${{ secrets.SNOWFLAKE_SCHEMA }}" "SNOWFLAKE_SCHEMA"
-        
-            echo "✅ All secrets are correctly populated. Proceeding with deployment!"
-        
+      - name: Verify Secrets Before Deployment
+        run: |
+          check_secret() {
+            if [ -z "$1" ]; then
+              echo "❌ $2 is MISSING or EMPTY"
+              exit 1
+            else
+              echo "✅ $2 is OK"
+            fi
+          }
+
+          echo "🔍 Checking GitHub Secrets..."
+          check_secret "${{ secrets.SNOWFLAKE_ACCOUNT }}" "SNOWFLAKE_ACCOUNT"
+          check_secret "${{ secrets.SNOWFLAKE_USER }}" "SNOWFLAKE_USER"
+          check_secret "${{ secrets.SNOWFLAKE_PASSWORD }}" "SNOWFLAKE_PASSWORD"
+          check_secret "${{ secrets.SNOWFLAKE_ROLE }}" "SNOWFLAKE_ROLE"
+          check_secret "${{ secrets.SNOWFLAKE_WAREHOUSE }}" "SNOWFLAKE_WAREHOUSE"
+          check_secret "${{ secrets.SNOWFLAKE_DATABASE_STAGE }}" "SNOWFLAKE_DATABASE_STAGE"
+          check_secret "${{ secrets.SNOWFLAKE_SCHEMA }}" "SNOWFLAKE_SCHEMA"
+
+          echo "✅ All secrets are correctly populated. Proceeding with deployment!"
 
       - name: Deploy to STAGE_DB using schemachange
         env:
