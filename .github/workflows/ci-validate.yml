@@ -39,11 +39,11 @@ jobs:
         run: |
           schemachange \
             -f sql \
-            --account "${{ secrets.SNOWFLAKE_ACCOUNT }}" \
-            --user "${{ secrets.SNOWFLAKE_USER }}" \
-            --role "${{ secrets.SNOWFLAKE_ROLE }}" \
-            --warehouse "${{ secrets.SNOWFLAKE_WAREHOUSE }}" \
-            --database "${{ secrets.SNOWFLAKE_DATABASE }}" \
-            --schema "${{ secrets.SNOWFLAKE_SCHEMA }}" \
-            --change-history-table "${{ secrets.SNOWFLAKE_DATABASE }}.SCHEMACHANGE.CHANGE_HISTORY" \
+            --account=${{ secrets.SNOWFLAKE_ACCOUNT }} \
+            --user=${{ secrets.SNOWFLAKE_USER }} \
+            --role=${{ secrets.SNOWFLAKE_ROLE }} \
+            --warehouse=${{ secrets.SNOWFLAKE_WAREHOUSE }} \
+            --database=${{ secrets.SNOWFLAKE_DATABASE }} \
+            --schema=${{ secrets.SNOWFLAKE_SCHEMA }} \
+            --change-history-table=${{ secrets.SNOWFLAKE_DATABASE }}.SCHEMACHANGE.CHANGE_HISTORY \
             --create-change-history-table
