@@ -1,39 +1,35 @@
-name: snowflake-devops-demo
+name: CI Pipeline - Stage
 
 on:
   push:
     branches:
       - stage
 
-  workflow_dispatch:
-
 jobs:
-  deploy-snowflake-changes-job:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          python-version: 3.11
+          python-version: '3.11'
 
       - name: Install schemachange
-        run: |
-          echo "Installing schemachange"
-          pip install schemachange
+        run: pip install schemachange
 
-      - name: Deploy changes with schemachange
-        env:
-          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
-          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
-          SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
-          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
-          SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE_STAGE }}
-          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
+      - name: Run schemachange (Dry Run) on Stage
         run: |
-          echo "Deploying Snowflake changes..."
-          schemachange -f sql/ --create-change-history-table
+          schemachange -f sql/ \
+            -a ${{ secrets.SNOWFLAKE_ACCOUNT }} \
+            -u ${{ secrets.SNOWFLAKE_USER }} \
+            -r ${{ secrets.SNOWFLAKE_ROLE }} \
+            -w ${{ secrets.SNOWFLAKE_WAREHOUSE }} \
+            -d ${{ secrets.SNOWFLAKE_DATABASE_STAGE }} \
+            -s ${{ secrets.SNOWFLAKE_SCHEMA }} \
+            -p ${{ secrets.SNOWFLAKE_PASSWORD }} \
+            --create-change-history-table \
+            --dry-run
