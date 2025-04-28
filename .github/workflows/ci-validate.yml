@@ -33,24 +33,6 @@ jobs:
         run: |
           sqlfluff lint sql/
 
-      - name: Create connections.toml
-        run: |
-          cat <<EOF > connections.toml
-          [snowflake_connection]
-          account = "${{ secrets.SNOWFLAKE_ACCOUNT }}"
-          user = "${{ secrets.SNOWFLAKE_USER }}"
-          password = "${{ secrets.SNOWFLAKE_PASSWORD }}"
-          role = "${{ secrets.SNOWFLAKE_ROLE }}"
-          warehouse = "${{ secrets.SNOWFLAKE_WAREHOUSE }}"
-          database = "${{ secrets.SNOWFLAKE_DATABASE_STAGE }}"
-          schema = "${{ secrets.SNOWFLAKE_SCHEMA }}"
-          EOF
-
-      - name: Debug connections.toml
-        run: |
-          echo "====== Printing connections.toml ======"
-          cat connections.toml
-
       - name: Verify Secrets Before Deployment
         run: |
           check_secret() {
@@ -75,6 +57,12 @@ jobs:
 
       - name: Deploy to STAGE_DB using schemachange
         env:
-          SNOWFLAKE_CONNECTIONS: ./connections.toml
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+          SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
+          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+          SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE_STAGE }}
+          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
         run: |
           schemachange -f sql/ --create-change-history-table
