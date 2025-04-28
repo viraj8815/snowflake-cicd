@@ -59,4 +59,4 @@ jobs:
 
       - name: Deploy changes to STAGE_DB using schemachange
         run: |
-          schemachange -f sql/scripts -c snowflake_connection --create-change-history-table
+          schemachange -f sql/ -c snowflake_connection --create-change-history-table
