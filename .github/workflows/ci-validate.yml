@@ -57,3 +57,4 @@ jobs:
             --connection-name connections \
             --change-history-table "SCHEMACHANGE.CHANGE_HISTORY" \
             --create-change-history-table
+            --dry-run
