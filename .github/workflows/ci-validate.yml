@@ -1,4 +1,4 @@
-name: CI Pipeline - Stage Validation (with Hardcoded Credentials)
+name: CI Pipeline - Stage Validation (with Hardcoded ENV Variables)
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - stage
 
 jobs:
-  build:
+  validate:
     runs-on: ubuntu-latest
 
     steps:
@@ -21,26 +21,14 @@ jobs:
       - name: Install schemachange
         run: pip install schemachange
 
-      - name: Create .schemachange/connections.toml
+      - name: Validate SQL Changes (Dry Run Style)
         run: |
-          mkdir -p .schemachange
-          cat <<EOF > .schemachange/connections.toml
-            [connections]
-
-            [connections.snowflake_connection]
-            type = "snowflake"
-            account = "gszncrk-nvb75074"
-            user = "virajcom1"
-            password = "Viraj@1234567890"
-            role = "accountadmin"
-            warehouse = "compute_wh"
-            database = "STAGE_DB"
-            schema = "PUBLIC"
-            EOF
-
-      - name: Debug Print connections.toml (optional)
-        run: cat .schemachange/connections.toml
-
-      - name: Validate SQL Changes (Dry Run)
-        run: |
-          schemachange deploy -f sql/ --create-change-history-table --connection-name snowflake_connection --config-folder .schemachange --connection-override-type toml
+          schemachange deploy -f sql/ --create-change-history-table
+        env:
+          SNOWFLAKE_ACCOUNT: gszncrk-nvb75074
+          SNOWFLAKE_USER: virajcom1
+          SNOWFLAKE_PASSWORD: Viraj@1234567890
+          SNOWFLAKE_ROLE: accountadmin
+          SNOWFLAKE_WAREHOUSE: compute_wh
+          SNOWFLAKE_DATABASE: STAGE_DB
+          SNOWFLAKE_SCHEMA: PUBLIC
