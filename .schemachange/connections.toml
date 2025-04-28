@@ -1,8 +1,11 @@
-[snowflake_connection]
-account = 'gszncrk-nvb75074'
-user = 'virajcom1'
-password = 'Viraj@1234567890'
-role = 'accountadmin'
-warehouse = 'compute_wh'
-database = 'STAGE_DB'
-schema = 'PUBLIC'
+[connections]
+
+[connections.snowflake_connection]
+type = "snowflake"
+account = "gszncrk-nvb75074"
+user = "virajcom1"
+password = "Viraj@1234567890"
+role = "accountadmin"
+warehouse = "compute_wh"
+database = "STAGE_DB"
+schema = "PUBLIC"
