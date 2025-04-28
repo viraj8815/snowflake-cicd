@@ -35,7 +35,7 @@ jobs:
           schema = 'PUBLIC'
           EOF
 
-      - name: Debug: Print connections.toml (optional)
+      - name: Debug Print connections.toml (optional)
         run: cat .schemachange/connections.toml
 
       - name: Validate SQL Changes (Dry Run)
