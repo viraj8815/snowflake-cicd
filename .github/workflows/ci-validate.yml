@@ -1,4 +1,4 @@
-name: CI Pipeline - Stage Validation (Proper ENV Injection)
+name: CI Pipeline - Stage Validation (Proper ENV Export)
 
 on:
   push:
@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Set up Python
@@ -23,8 +23,8 @@ jobs:
 
       - name: Validate SQL Changes (Dry Run)
         run: |
-          export SNOWFLAKE_ACCOUNT=jhb95184.us-east-1
-          export USER=virajcom1
+          export SNOWFLAKE_ACCOUNT=gszncrk-nvb75074
+          export SNOWFLAKE_USER=virajcom1
           export SNOWFLAKE_PASSWORD='Viraj@1234567890'
           export SNOWFLAKE_ROLE=accountadmin
           export SNOWFLAKE_WAREHOUSE=compute_wh
