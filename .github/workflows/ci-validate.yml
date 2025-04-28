@@ -44,6 +44,10 @@ jobs:
           echo "database = '${{secrets.SNOWFLAKE_DATABASE_STAGE}}'" >> connections.toml
           echo "schema = '${{secrets.SNOWFLAKE_SCHEMA}}'" >> connections.toml
 
+      - name: Debug check connections.toml contents
+        run: |
+          cat connections.toml
+
       - name: Deploy changes to STAGE_DB using schemachange
         run: |
           schemachange -f sql/ -c snowflake_connection --create-change-history-table
