@@ -31,7 +31,8 @@ jobs:
           echo "warehouse = '${{ secrets.SNOWFLAKE_WAREHOUSE }}'" >> connections.toml
           echo "database = '${{ secrets.SNOWFLAKE_DATABASE_STAGE }}'" >> connections.toml
           echo "schema = '${{ secrets.SNOWFLAKE_SCHEMA }}'" >> connections.toml
-
-      - name: Validate SQL changes (Dry Run)
+      
+      - name: Validate SQL Changes (Dry Run)
         run: |
-          schemachange deploy -f sql/ -c connections.toml --create-change-history-table --dry-run
+          schemachange deploy -f sql/ -c connections.toml -p snowflake_connection --create-change-history-table --dry-run
+        
