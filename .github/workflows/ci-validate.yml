@@ -23,7 +23,7 @@ jobs:
 
       - name: Validate SQL Changes (Dry Run)
         run: |
-          export SNOWFLAKE_ACCOUNT=gszncrk-nvb75074
+          export SNOWFLAKE_ACCOUNT=jhb95184.us-east-1
           export SNOWFLAKE_USER=virajcom1
           export SNOWFLAKE_PASSWORD='Viraj@1234567890'
           export SNOWFLAKE_ROLE=accountadmin
