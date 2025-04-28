@@ -44,6 +44,11 @@ jobs:
           echo "database = \"${{ secrets.SNOWFLAKE_DATABASE_STAGE }}\"" >> connections.toml
           echo "schema = \"${{ secrets.SNOWFLAKE_SCHEMA }}\"" >> connections.toml
 
+      - name: Debug connections.toml
+        run: |
+          echo "====== Printing connections.toml ======"
+          cat connections.toml
+
       - name: Deploy to STAGE_DB using schemachange
         env:
           SNOWFLAKE_CONNECTIONS: ./connections.toml
