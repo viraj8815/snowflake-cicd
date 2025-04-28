@@ -36,13 +36,13 @@ jobs:
       - name: Create connections.toml for STAGE
         run: |
           echo "[snowflake_connection]" > connections.toml
-          echo "account = '${{ secrets.SNOWFLAKE_ACCOUNT }}'" >> connections.toml
-          echo "user = '${{ secrets.SNOWFLAKE_USER }}'" >> connections.toml
-          echo "password = '${{ secrets.SNOWFLAKE_PASSWORD }}'" >> connections.toml
-          echo "role = '${{ secrets.SNOWFLAKE_ROLE }}'" >> connections.toml
-          echo "warehouse = '${{ secrets.SNOWFLAKE_WAREHOUSE }}'" >> connections.toml
-          echo "database = '${{ secrets.SNOWFLAKE_DATABASE_STAGE }}'" >> connections.toml
-          echo "schema = '${{ secrets.SNOWFLAKE_SCHEMA }}'" >> connections.toml
+          echo "account = '${{secrets.SNOWFLAKE_ACCOUNT}}'" >> connections.toml
+          echo "user = '${{secrets.SNOWFLAKE_USER}}'" >> connections.toml
+          echo "password = '${{secrets.SNOWFLAKE_PASSWORD}}'" >> connections.toml
+          echo "role = '${{secrets.SNOWFLAKE_ROLE}}'" >> connections.toml
+          echo "warehouse = '${{secrets.SNOWFLAKE_WAREHOUSE}}'" >> connections.toml
+          echo "database = '${{secrets.SNOWFLAKE_DATABASE_STAGE}}'" >> connections.toml
+          echo "schema = '${{secrets.SNOWFLAKE_SCHEMA}}'" >> connections.toml
 
       - name: Deploy changes to STAGE_DB using schemachange
         run: |
