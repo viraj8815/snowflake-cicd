@@ -25,22 +25,22 @@ jobs:
         run: |
           mkdir -p .schemachange
           cat <<EOF > .schemachange/connections.toml
-          [connections]
+            [connections]
 
-          [connections.snowflake_connection]
-          type = "snowflake"
-          account = "gszncrk-nvb75074"
-          user = "virajcom1"
-          password = "Viraj@1234567890"
-          role = "accountadmin"
-          warehouse = "compute_wh"
-          database = "STAGE_DB"
-          schema = "PUBLIC"
-          EOF
+            [connections.snowflake_connection]
+            type = "snowflake"
+            account = "gszncrk-nvb75074"
+            user = "virajcom1"
+            password = "Viraj@1234567890"
+            role = "accountadmin"
+            warehouse = "compute_wh"
+            database = "STAGE_DB"
+            schema = "PUBLIC"
+            EOF
 
       - name: Debug Print connections.toml (optional)
         run: cat .schemachange/connections.toml
 
       - name: Validate SQL Changes (Dry Run)
         run: |
-          schemachange deploy -f sql/ --create-change-history-table --connection-name snowflake_connection --config-folder .schemachange
+          schemachange deploy -f sql/ --create-change-history-table --connection-name snowflake_connection --config-folder .schemachange --connection-override-type toml
