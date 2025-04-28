@@ -34,5 +34,5 @@ jobs:
       
       - name: Validate SQL Changes (Dry Run)
         run: |
-          schemachange deploy -f sql/ -c connections.toml -p snowflake_connection --create-change-history-table --dry-run
+          schemachange deploy -f sql/ -c connections.toml -c snowflake_connection --create-change-history-table --dry-run
         
