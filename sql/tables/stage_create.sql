@@ -1,5 +1,0 @@
-CREATE OR REPLACE TABLE STAGE_DB.PUBLIC.sample_stage_table (
-  id INT,
-  emp_name STRING,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
-);
