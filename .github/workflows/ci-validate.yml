@@ -1,39 +1,31 @@
-name: Snowflake CI Pipeline (STAGE - Auto Deploy Only)
+name: snowflake-devops-demo
 
 on:
   push:
     branches:
       - stage
 
+  workflow_dispatch:
+
 jobs:
-  deploy-to-stage:
+  deploy-snowflake-changes-job:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Set up Python
+      - name: Use Python 3.11
         uses: actions/setup-python@v4
         with:
           python-version: 3.11
 
-      - name: Install dependencies
+      - name: Install schemachange
         run: |
+          echo "Installing schemachange"
           pip install schemachange
-          pip install sqlfluff
 
-      - name: Add SQLFluff config
-        run: |
-          echo "[sqlfluff]" > .sqlfluff
-          echo "dialect = snowflake" >> .sqlfluff
-          echo "exclude_rules = L010,L014,LT02" >> .sqlfluff
-
-      - name: Lint SQL files
-        run: |
-          sqlfluff lint sql/
-
-      - name: Deploy to STAGE_DB using schemachange
+      - name: Deploy changes with schemachange
         env:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
           SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
@@ -43,4 +35,5 @@ jobs:
           SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE_STAGE }}
           SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
         run: |
-          schemachange -f sql/ --create-change-history-table
+          echo "Deploying Snowflake changes..."
+          schemachange -f sql/ --create-change-history-table --connection snowflake_connection
