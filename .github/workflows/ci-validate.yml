@@ -48,13 +48,13 @@ jobs:
 
       - name: Show connections.toml contents
         run: |
-          cat ~/.snowflake/connections.toml # Debug: Show file content
+          cat ~/.snowflake/connections.toml
 
       - name: Deploy to STAGE_DB using schemachange
         run: |
           schemachange \
             -f sql \
             --connection-name connections \
-            --change-history-table "SCHEMACHANGE.CHANGE_HISTORY" \
-            --create-change-history-table
+            --change-history-table "${{ secrets.SNOWFLAKE_SCHEMA }}.CHANGE_HISTORY" \
+            --create-change-history-table \
             --dry-run
