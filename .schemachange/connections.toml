@@ -1,5 +1,7 @@
 [connections]
 
+[connections.connections]
+type = "snowflake"
 account = "gszncrk-nvb75074"
 user = "virajcom1"
 password = "Viraj@1234567890"
