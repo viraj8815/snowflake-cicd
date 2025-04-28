@@ -1,4 +1,4 @@
-name: CI Pipeline - Stage Validation (with Hardcoded ENV Variables)
+name: CI Pipeline - Stage Validation (Proper ENV Injection)
 
 on:
   push:
@@ -21,14 +21,14 @@ jobs:
       - name: Install schemachange
         run: pip install schemachange
 
-      - name: Validate SQL Changes (Dry Run Style)
+      - name: Validate SQL Changes (Dry Run)
         run: |
+          export SNOWFLAKE_ACCOUNT=gszncrk-nvb75074
+          export SNOWFLAKE_USER=virajcom1
+          export SNOWFLAKE_PASSWORD='Viraj@1234567890'
+          export SNOWFLAKE_ROLE=accountadmin
+          export SNOWFLAKE_WAREHOUSE=compute_wh
+          export SNOWFLAKE_DATABASE=STAGE_DB
+          export SNOWFLAKE_SCHEMA=PUBLIC
+
           schemachange deploy -f sql/ --create-change-history-table
-        env:
-          SNOWFLAKE_ACCOUNT: gszncrk-nvb75074
-          SNOWFLAKE_USER: virajcom1
-          SNOWFLAKE_PASSWORD: Viraj@1234567890
-          SNOWFLAKE_ROLE: accountadmin
-          SNOWFLAKE_WAREHOUSE: compute_wh
-          SNOWFLAKE_DATABASE: STAGE_DB
-          SNOWFLAKE_SCHEMA: PUBLIC
