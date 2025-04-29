@@ -33,16 +33,30 @@ jobs:
         run: |
           sqlfluff lint sql/
 
+      - name: Create connections.toml file
+        run: |
+          mkdir -p ~/.snowflake
+          echo "[connections]" > ~/.snowflake/connections.toml
+          echo "account = \"${{ secrets.SNOWFLAKE_ACCOUNT }}\"" >> ~/.snowflake/connections.toml
+          echo "user = \"${{ secrets.SNOWFLAKE_USER }}\"" >> ~/.snowflake/connections.toml
+          echo "password = \"${{ secrets.SNOWFLAKE_PASSWORD }}\"" >> ~/.snowflake/connections.toml
+          echo "role = \"${{ secrets.SNOWFLAKE_ROLE }}\"" >> ~/.snowflake/connections.toml
+          echo "warehouse = \"${{ secrets.SNOWFLAKE_WAREHOUSE }}\"" >> ~/.snowflake/connections.toml
+          echo "database = \"${{ secrets.SNOWFLAKE_DATABASE_STAGE }}\"" >> ~/.snowflake/connections.toml
+          echo "schema = \"${{ secrets.SNOWFLAKE_SCHEMA }}\"" >> ~/.snowflake/connections.toml
+          chmod 0600 ~/.snowflake/connections.toml
+
+      - name: Show connections.toml contents
+        run: |
+          cat ~/.snowflake/connections.toml
+
       - name: Deploy to STAGE_DB using schemachange
         run: |
-          schemachange \
-            --root-folder sql/ \
-            --account "${{ secrets.SNOWFLAKE_ACCOUNT }}" \
-            --username "${{ secrets.SNOWFLAKE_USER }}" \
-            --password "${{ secrets.SNOWFLAKE_PASSWORD }}" \
-            --role "${{ secrets.SNOWFLAKE_ROLE }}" \
-            --warehouse "${{ secrets.SNOWFLAKE_WAREHOUSE }}" \
-            --database "${{ secrets.SNOWFLAKE_DATABASE_STAGE }}" \
-            --schema "${{ secrets.SNOWFLAKE_SCHEMA }}" \
+            schemachange \
+            -f sql/ \
+            --connection-name connections \
             --change-history-table "${{ secrets.SNOWFLAKE_DATABASE_STAGE }}.${{ secrets.SNOWFLAKE_SCHEMA }}.CHANGE_HISTORY" \
-            --create-change-history-table
+            --create-change-history-table \
+
+        
+        
