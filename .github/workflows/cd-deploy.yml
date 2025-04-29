@@ -1,4 +1,4 @@
-name: Snowflake CD Pipeline (PROD - Deploy)
+name: Snowflake CD Pipeline (PROD - Real Deployment)
 
 on:
   push:
@@ -21,29 +21,28 @@ jobs:
       - name: Install dependencies
         run: |
           pip install schemachange
-          pip install sqlfluff
 
-      - name: Add SQLFluff config to ignore casing and indent rules
+      - name: Create connections.toml file
         run: |
-          echo "[sqlfluff]" > .sqlfluff
-          echo "dialect = snowflake" >> .sqlfluff
-          echo "exclude_rules = L010,L014,LT02" >> .sqlfluff
+          mkdir -p ~/.snowflake
+          echo "[connections]" > ~/.snowflake/connections.toml
+          echo "account = \"${{ secrets.SNOWFLAKE_ACCOUNT }}\"" >> ~/.snowflake/connections.toml
+          echo "user = \"${{ secrets.SNOWFLAKE_USER }}\"" >> ~/.snowflake/connections.toml
+          echo "password = \"${{ secrets.SNOWFLAKE_PASSWORD }}\"" >> ~/.snowflake/connections.toml
+          echo "role = \"${{ secrets.SNOWFLAKE_ROLE }}\"" >> ~/.snowflake/connections.toml
+          echo "warehouse = \"${{ secrets.SNOWFLAKE_WAREHOUSE }}\"" >> ~/.snowflake/connections.toml
+          echo "database = \"${{ secrets.SNOWFLAKE_DATABASE_PROD }}\"" >> ~/.snowflake/connections.toml
+          echo "schema = \"${{ secrets.SNOWFLAKE_SCHEMA }}\"" >> ~/.snowflake/connections.toml
+          chmod 0600 ~/.snowflake/connections.toml
 
-      - name: Run SQLFluff lint
+      - name: Show connections.toml contents (for debug)
         run: |
-          sqlfluff lint sql/
+          cat ~/.snowflake/connections.toml
 
       - name: Deploy to PROD_DB using schemachange
-        env:
-          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
         run: |
           schemachange \
-            -f sql \
-            -a "${{ secrets.SNOWFLAKE_ACCOUNT }}" \
-            -u "${{ secrets.SNOWFLAKE_USER }}" \
-            -r "${{ secrets.SNOWFLAKE_ROLE }}" \
-            -w "${{ secrets.SNOWFLAKE_WAREHOUSE }}" \
-            -d "PROD_DB" \
-            -s "${{ secrets.SNOWFLAKE_SCHEMA }}" \
-            -c "PROD_DB.SCHEMACHANGE.CHANGE_HISTORY" \
+            -f sql/ \
+            --connection-name connections \
+            --change-history-table "${{ secrets.SNOWFLAKE_DATABASE_PROD }}.${{ secrets.SNOWFLAKE_SCHEMA }}.CHANGE_HISTORY" \
             --create-change-history-table

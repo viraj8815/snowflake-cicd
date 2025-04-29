@@ -1,8 +1,0 @@
-[connections.default]
-user = "MY_DEPLOY_USER"
-password = "MySecurePassword123"
-account = "xy12345.us-east-1"
-role = "SYSADMIN"
-warehouse = "COMPUTE_WH"
-database = "STAGE_DB"
-schema = "PUBLIC"
