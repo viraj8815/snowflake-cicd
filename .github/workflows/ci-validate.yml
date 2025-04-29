@@ -53,7 +53,7 @@ jobs:
       - name: Deploy to STAGE_DB using schemachange
         run: |
             schemachange \
-            -f sql/scripts \
+            -f sql/ \
             --connection-name connections \
             --change-history-table "${{ secrets.SNOWFLAKE_DATABASE_STAGE }}.${{ secrets.SNOWFLAKE_SCHEMA }}.CHANGE_HISTORY" \
             --create-change-history-table \
