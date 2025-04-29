@@ -57,6 +57,6 @@ jobs:
             --connection-name connections \
             --change-history-table "${{ secrets.SNOWFLAKE_DATABASE_STAGE }}.${{ secrets.SNOWFLAKE_SCHEMA }}.CHANGE_HISTORY" \
             --create-change-history-table \
-            --dry-run
+
         
         
