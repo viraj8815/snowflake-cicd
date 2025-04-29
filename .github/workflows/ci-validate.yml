@@ -37,13 +37,13 @@ jobs:
         run: |
           mkdir -p ~/.snowflake
           echo "[connections]" > ~/.snowflake/connections.toml
-          echo "account = \"${{ secrets.SNOWFLAKE_ACCOUNT }}\"" >> ~/.snowflake/connections.toml
-          echo "user = \"${{ secrets.SNOWFLAKE_USER }}\"" >> ~/.snowflake/connections.toml
-          echo "password = \"${{ secrets.SNOWFLAKE_PASSWORD }}\"" >> ~/.snowflake/connections.toml
-          echo "role = \"${{ secrets.SNOWFLAKE_ROLE }}\"" >> ~/.snowflake/connections.toml
-          echo "warehouse = \"${{ secrets.SNOWFLAKE_WAREHOUSE }}\"" >> ~/.snowflake/connections.toml
-          echo "database = \"${{ secrets.SNOWFLAKE_DATABASE_STAGE }}\"" >> ~/.snowflake/connections.toml
-          echo "schema = \"${{ secrets.SNOWFLAKE_SCHEMA }}\"" >> ~/.snowflake/connections.toml
+          echo "account = \"gszncrk-nvb75074\"" >> ~/.snowflake/connections.toml
+          echo "user = \"virajcom1\"" >> ~/.snowflake/connections.toml
+          echo "password = \"Viraj@1234567890\"" >> ~/.snowflake/connections.toml
+          echo "role = \"accountadmin\"" >> ~/.snowflake/connections.toml
+          echo "warehouse = \"compute_wh\"" >> ~/.snowflake/connections.toml
+          echo "database = \"STAGE_DB\"" >> ~/.snowflake/connections.toml
+          echo "schema = \"PUBLIC\"" >> ~/.snowflake/connections.toml
           chmod 0600 ~/.snowflake/connections.toml
 
       - name: Show connections.toml contents
@@ -55,7 +55,7 @@ jobs:
             schemachange \
             -f sql/ \
             --connection-name connections \
-            --change-history-table "${{ secrets.SNOWFLAKE_DATABASE_STAGE }}.${{ secrets.SNOWFLAKE_SCHEMA }}.CHANGE_HISTORY" \
+            --change-history-table "STAGE_DB.PUBLIC.CHANGE_HISTORY" \
             --create-change-history-table \
 
         
