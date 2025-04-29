@@ -1,8 +1,8 @@
 [connections]
-account = "gszncrk-nvb75074"
-user = "virajcom1"
-password = "Viraj@1234567890"
-role = "accountadmin"
-warehouse = "compute_wh"
-database = "STAGE_DB"
-schema = "PUBLIC"
+account = "${{ secrets.SNOWFLAKE_ACCOUNT }}"
+user = "${{ secrets.SNOWFLAKE_USER }}"
+password = "${{ secrets.SNOWFLAKE_PASSWORD }}"
+role = "${{ secrets.SNOWFLAKE_ROLE }}"
+warehouse = "${{ secrets.SNOWFLAKE_WAREHOUSE }}"
+database = "${{ secrets.SNOWFLAKE_DATABASE_STAGE }}"   # or SNOWFLAKE_DATABASE_PROD for prod deploy
+schema = "${{ secrets.SNOWFLAKE_SCHEMA }}"
