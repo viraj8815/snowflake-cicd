@@ -2,14 +2,10 @@ name: MLOps - Train & Upload Model to Snowflake
 
 on:
   push:
-    branches: 
-      - stage
-      - main 
-
-  workflow_dispatch:
+    branches: [stage, main]
 
 jobs:
-  train-and-upload-model:
+  mlops:
     runs-on: ubuntu-latest
 
     steps:
@@ -23,13 +19,14 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install --upgrade pip
           pip install pandas scikit-learn snowflake-connector-python
 
-      - name: Train ML model
+      - name: Train model (only in stage)
+        if: github.ref == 'refs/heads/stage'
         run: python ml/train_model.py
 
-      - name: Upload model.pkl to Snowflake stage
+      - name: Upload model to STAGE
+        if: github.ref == 'refs/heads/stage'
         run: python ml/upload_model.py
         env:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
@@ -38,4 +35,16 @@ jobs:
           SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
           SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
           SNOWFLAKE_DATABASE_STAGE: ${{ secrets.SNOWFLAKE_DATABASE_STAGE }}
+          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
+
+      - name: Upload model to PROD
+        if: github.ref == 'refs/heads/main'
+        run: python ml/upload_model.py
+        env:
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+          SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
+          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+          SNOWFLAKE_DATABASE_PROD: ${{ secrets.SNOWFLAKE_DATABASE_PROD }}
           SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
