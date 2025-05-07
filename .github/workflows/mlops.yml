@@ -2,8 +2,8 @@ name: MLOps - Train & Upload Model
 
 on:
   push:
-    branches: [ml]
-  workflow_dispatch:
+    branches:
+      - stage
 
 jobs:
   train-upload-model:
