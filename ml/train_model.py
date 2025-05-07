@@ -24,3 +24,5 @@ with open("ml/model.pkl", "wb") as f:
     pickle.dump(model, f)
 
 print("✅ Model trained and saved to ml/model.pkl")
+
+
