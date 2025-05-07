@@ -1,0 +1,38 @@
+name: MLOps - Train & Upload Model
+
+on:
+  push:
+    branches: [ml]
+  workflow_dispatch:
+
+jobs:
+  train-upload-model:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
+
+      - name: Install dependencies
+        run: |
+          pip install -r ml/requirements.txt
+
+      - name: Train model
+        run: python ml/train_model.py
+
+      - name: Upload model to Snowflake stage
+        run: |
+          pip install snowflake-connector-python
+          snowsql -a "${{ secrets.SNOWFLAKE_ACCOUNT }}" \
+                  -u "${{ secrets.SNOWFLAKE_USER }}" \
+                  -p "${{ secrets.SNOWFLAKE_PASSWORD }}" \
+                  -r "${{ secrets.SNOWFLAKE_ROLE }}" \
+                  -w "${{ secrets.SNOWFLAKE_WAREHOUSE }}" \
+                  -d "${{ secrets.SNOWFLAKE_DATABASE_STAGE }}" \
+                  -s "${{ secrets.SNOWFLAKE_SCHEMA }}" \
+                  -q "PUT file://ml/model.pkl @ml_models_stage overwrite=true;"
