@@ -2,7 +2,9 @@ name: MLOps - Train & Upload Model to Snowflake
 
 on:
   push:
-    branches: [stage]
+    branches: 
+      - stage
+      - main 
 
   workflow_dispatch:
 
