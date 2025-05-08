@@ -16,7 +16,7 @@ LANGUAGE PYTHON
 RUNTIME_VERSION = '3.8'
 HANDLER = 'predict'
 PACKAGES = ('scikit-learn', 'pandas', 'cloudpickle')
-IMPORTS = ('@STAGE_DB.PUBLIC.ml_models_stage/model.pkl.gz')
+IMPORTS = ('@ml_models_stage/model.pkl.gz' AS 'model.pkl.gz')
 AS
 $$
 import cloudpickle
