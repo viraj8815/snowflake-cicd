@@ -1,0 +1,2 @@
+[console_scripts]
+schemachange = schemachange.cli:main

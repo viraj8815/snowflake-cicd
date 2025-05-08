@@ -1,0 +1,62 @@
+name: Snowflake CI Pipeline (STAGE - Auto Deploy + PR)
+
+on:
+  push:
+    branches:
+      - stage
+
+jobs:
+  deploy-to-stage:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
+
+      - name: Install dependencies
+        run: |
+          pip install schemachange
+          pip install sqlfluff
+
+      - name: Add SQLFluff config to ignore casing and indent rules
+        run: |
+          echo "[sqlfluff]" > .sqlfluff
+          echo "dialect = snowflake" >> .sqlfluff
+          echo "exclude_rules = L010,L014,LT02,LT01" >> .sqlfluff
+
+      - name: Run SQLFluff lint
+        run: |
+          sqlfluff lint sql/
+
+      - name: Create connections.toml file
+        run: |
+          mkdir -p ~/.snowflake
+          echo "[connections]" > ~/.snowflake/connections.toml
+          echo "account = \"${{ secrets.SNOWFLAKE_ACCOUNT }}\"" >> ~/.snowflake/connections.toml
+          echo "user = \"${{ secrets.SNOWFLAKE_USER }}\"" >> ~/.snowflake/connections.toml
+          echo "password = \"${{ secrets.SNOWFLAKE_PASSWORD }}\"" >> ~/.snowflake/connections.toml
+          echo "role = \"${{ secrets.SNOWFLAKE_ROLE }}\"" >> ~/.snowflake/connections.toml
+          echo "warehouse = \"${{ secrets.SNOWFLAKE_WAREHOUSE }}\"" >> ~/.snowflake/connections.toml
+          echo "database = \"${{ secrets.SNOWFLAKE_DATABASE_STAGE }}\"" >> ~/.snowflake/connections.toml
+          echo "schema = \"${{ secrets.SNOWFLAKE_SCHEMA }}\"" >> ~/.snowflake/connections.toml
+          chmod 0600 ~/.snowflake/connections.toml
+
+      - name: Show connections.toml contents
+        run: |
+          cat ~/.snowflake/connections.toml
+
+      - name: Deploy to STAGE_DB using schemachange
+        run: |
+            schemachange \
+            -f sql/ \
+            --connection-name connections \
+            --change-history-table "${{ secrets.SNOWFLAKE_DATABASE_STAGE }}.${{ secrets.SNOWFLAKE_SCHEMA }}.CHANGE_HISTORY" \
+            --create-change-history-table \
+
+        
+        
