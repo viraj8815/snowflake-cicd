@@ -15,24 +15,26 @@ HANDLER = 'predict'
 IMPORTS = ('@ml_models_stage/model.pkl.gz')
 AS
 $$
+import _pickle as pickle
 import gzip
-import pickle
+import os
 
 with gzip.open("model.pkl.gz", "rb") as f:
     model = pickle.load(f)
 
-def predict(ss_sales_price, ss_quantity, ss_ext_discount_amt, ss_net_profit,
-            d_year, d_month_seq, d_day, s_closed_date_sk):
+def predict(ss_sales_price, ss_quantity, ss_ext_discount_amt, ss_net_profit):
+    # Get the import directory
+    import_dir = os.path.dirname(os.path.realpath(__file__))
+    model_path = os.path.join(import_dir, "model.pkl.gz")
+
+    with gzip.open(model_path, "rb") as f:
+        model = pickle.load(f)
+
     features = [[
         ss_sales_price,
         ss_quantity,
         ss_ext_discount_amt,
-        ss_net_profit,
-        d_year,
-        d_month_seq,
-        d_day,
-        s_closed_date_sk
+        ss_net_profit
     ]]
-    prediction = model.predict(features)
-    return float(prediction[0])
+    return str(model.predict(features)[0])
 $$;
