@@ -19,7 +19,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install pandas scikit-learn snowflake-connector-python
+          pip install -r requirements.txt
 
       - name: Train ML model
         run: python ml/train_model.py
