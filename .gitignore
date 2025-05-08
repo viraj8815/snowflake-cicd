@@ -2,3 +2,4 @@
 ml/model.pkl.gz
 ml/model.pkl.gz
 *.pkl.gz
+snowflake-cicd.git/
