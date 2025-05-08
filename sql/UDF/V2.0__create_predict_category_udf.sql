@@ -10,9 +10,9 @@ CREATE OR REPLACE FUNCTION infer_model_v2(
 )
 RETURNS FLOAT
 LANGUAGE PYTHON
-RUNTIME_VERSION = '3.8'
+RUNTIME_VERSION = '3.10'
 HANDLER = 'predict'
-PACKAGES = ('scikit-learn', 'pandas', 'joblib','cloudpickle', 'numpy==1.*')
+PACKAGES = ('scikit-learn', 'pandas', 'joblib','cloudpickle', 'numpy==2.2.4')
 IMPORTS = ('@ml_models_stage/model.pkl.gz')
 AS
 $$
