@@ -1,37 +1,40 @@
-CREATE OR REPLACE FUNCTION predict_category(
+-- deploy: true
+-- change_type: python_udf
+
+CREATE OR REPLACE FUNCTION infer_model_v2(
     ss_sales_price FLOAT,
     ss_quantity FLOAT,
     ss_ext_discount_amt FLOAT,
     ss_net_profit FLOAT,
-    d_year FLOAT,
-    d_month_seq FLOAT,
-    d_day FLOAT,
-    s_closed_date_sk FLOAT
+    d_year INT,
+    d_month INT,
+    d_day INT,
+    s_closed_date_sk INT
 )
 RETURNS FLOAT
 LANGUAGE PYTHON
 RUNTIME_VERSION = '3.8'
 HANDLER = 'predict'
+PACKAGES = ('scikit-learn', 'pandas', 'cloudpickle')
 IMPORTS = ('@ml_models_stage/model.pkl.gz')
 AS
 $$
-import _pickle as pickle
+import cloudpickle
 import gzip
-import os
 
+with gzip.open("model.pkl.gz", "rb") as f:
+    model = cloudpickle.load(f)
 
-def predict(ss_sales_price, ss_quantity, ss_ext_discount_amt, ss_net_profit):
-    import_dir = os.path.dirname(os.path.realpath(__file__))
-    model_path = os.path.join(import_dir, "model.pkl.gz")
-
-    with gzip.open(model_path, "rb") as f:
-        model = pickle.load(f)
-
+def predict(ss_sales_price, ss_quantity, ss_ext_discount_amt, ss_net_profit, d_year, d_month, d_day, s_closed_date_sk):
     features = [[
         ss_sales_price,
         ss_quantity,
         ss_ext_discount_amt,
-        ss_net_profit
+        ss_net_profit,
+        d_year,
+        d_month,
+        d_day,
+        s_closed_date_sk
     ]]
-    return str(model.predict(features)[0])
+    return float(model.predict(features)[0])
 $$;
