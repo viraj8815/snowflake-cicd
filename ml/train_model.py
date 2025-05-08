@@ -5,6 +5,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 import pickle
 import gzip
+import cloudpickle
 import os
 import snowflake.connector
 
@@ -51,7 +52,7 @@ model.fit(X_train, y_train)
 
 # Save model
 os.makedirs("ml", exist_ok=True)
-with open("ml/model.pkl.gz", "wb") as f:
+with gzip.open("ml/model.pkl.gz", "wb") as f:
     pickle.dump(model, f)
 
 print("✅ Model trained and saved to ml/model.pkl.gz")
