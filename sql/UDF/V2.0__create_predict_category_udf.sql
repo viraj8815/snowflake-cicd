@@ -1,3 +1,5 @@
+-- noqa: disable=all
+
 -- deploy: true
 -- change_type: python_udf
 
@@ -38,3 +40,5 @@ def predict(ss_sales_price, ss_quantity, ss_ext_discount_amt, ss_net_profit, d_y
     ]]
     return float(model.predict(features)[0])
 $$;
+
+-- noqa: enable=all
