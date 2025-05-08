@@ -54,6 +54,6 @@ model.fit(X_train, y_train)
 # Save model
 os.makedirs("ml", exist_ok=True)
 with gzip.open("ml/model.pkl.gz", "wb") as f:
-    joblib.dump(model, f)
+    cloudpickle.dump(model, f)
 
 print("✅ Model trained and saved to ml/model.pkl.gz")
