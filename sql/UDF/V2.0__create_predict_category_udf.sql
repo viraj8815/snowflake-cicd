@@ -12,14 +12,16 @@ RETURNS FLOAT
 LANGUAGE PYTHON
 RUNTIME_VERSION = '3.8'
 HANDLER = 'predict'
-PACKAGES = ('scikit-learn', 'pandas', 'cloudpickle')
+PACKAGES = ('scikit-learn', 'pandas', 'joblib','cloudpickle', 'numpy==1.*')
 IMPORTS = ('@ml_models_stage/model.pkl.gz')
 AS
 $$
+import joblib
 import cloudpickle
 import gzip
 import sys
 import os
+import numpy as np
 
 model_path = os.path.join(sys._xoptions["snowflake_import_directory"], "model.pkl.gz")
 
