@@ -19,15 +19,10 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install pandas scikit-learn snowflake-connector-python
+          pip install -r ml/requirements.txt
 
-      - name: Train model (only in stage)
-        if: github.ref == 'refs/heads/stage'
+      - name: Train ML model
         run: python ml/train_model.py
-
-      - name: Upload model to STAGE
-        if: github.ref == 'refs/heads/stage'
-        run: python ml/upload_model.py
         env:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
           SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
@@ -37,8 +32,7 @@ jobs:
           SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE_STAGE }}
           SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
 
-      - name: Upload model to PROD
-        if: github.ref == 'refs/heads/main'
+      - name: Upload model to Snowflake stage
         run: python ml/upload_model.py
         env:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
@@ -46,5 +40,5 @@ jobs:
           SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
           SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
           SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
-          SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE_PROD }}
+          SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE_STAGE }}
           SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}

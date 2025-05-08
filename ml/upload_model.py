@@ -1,13 +1,9 @@
-# ml/upload_model.py
-
 import os
 import snowflake.connector
 
-# ✅ Read model file
-file_path = "ml/model.pkl"
+file_path = "ml/model.pkl.gz"
 stage_name = "@ml_models_stage"
 
-# ✅ Connect to Snowflake
 conn = snowflake.connector.connect(
     user=os.environ["SNOWFLAKE_USER"],
     password=os.environ["SNOWFLAKE_PASSWORD"],
