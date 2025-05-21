@@ -132,5 +132,3 @@ $$;
 finally:
     cursor.close()
     conn.close()
-
-    
