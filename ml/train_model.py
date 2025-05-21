@@ -71,3 +71,5 @@ with open("ml/metrics.json", "w") as f:
     json.dump(metrics, f, indent=2)
 
 print(f"✅ Model trained and saved with base metrics, signature, and baseline.")
+
+
