@@ -129,17 +129,6 @@ try:
     else:
         print("❌ Accuracy not improved. Skipping versioning and promotion.")
 
-        # Optional: Cleanup base files
-        for f in [
-            "ml/model.pkl.gz",
-            "ml/signature.json",
-            "ml/drift_baseline.json",
-            "ml/metrics.json"
-        ]:
-            if os.path.exists(f):
-                os.remove(f)
-        print("🧹 Base artifacts removed since model was not promoted.")
-
 finally:
     cursor.close()
     conn.close()
