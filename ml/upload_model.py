@@ -1,4 +1,4 @@
-# ✅ upload_model.py (only move to next version if accuracy is better)
+# ✅ Full upload_model.py with versioning, promotion check, UDF auto-redeployment
 
 import os
 import json
@@ -89,8 +89,56 @@ try:
         """)
         print("🏆 New champion promoted.")
 
+        # Auto-redeploy Python UDF to use new champion version
+        udf_sql = f"""
+        CREATE OR REPLACE FUNCTION predict_category(
+            price FLOAT,
+            qty INT,
+            discount FLOAT,
+            profit FLOAT,
+            year INT,
+            month INT,
+            day INT,
+            closed_date_sk INT
+        )
+        RETURNS FLOAT
+        LANGUAGE PYTHON
+        RUNTIME_VERSION = '3.10'
+        HANDLER = 'predict'
+        PACKAGES = ('scikit-learn', 'cloudpickle', 'numpy')
+        IMPORTS = ('@ml_models_stage/model_{model_version}.pkl.gz')
+        AS
+        $$
+        import cloudpickle, gzip, sys, os
+
+        model_path = os.path.join(
+            sys._xoptions["snowflake_import_directory"],
+            "model_{model_version}.pkl.gz"
+        )
+
+        with gzip.open(model_path, "rb") as f:
+            model = cloudpickle.load(f)
+
+        def predict(price, qty, discount, profit, year, month, day, closed_date_sk):
+            return float(model.predict([[price, qty, discount, profit, year, month, day, closed_date_sk]])[0])
+        $$;
+        """
+        cursor.execute(udf_sql)
+        print("🔁 Auto-redeployed UDF for new champion model.")
+
     else:
         print("❌ Accuracy not improved. Skipping versioning and promotion.")
+
+        # Optional: Cleanup base files
+        for f in [
+            "ml/model.pkl.gz",
+            "ml/signature.json",
+            "ml/drift_baseline.json",
+            "ml/metrics.json"
+        ]:
+            if os.path.exists(f):
+                os.remove(f)
+        print("🧹 Base artifacts removed since model was not promoted.")
 
 finally:
     cursor.close()
