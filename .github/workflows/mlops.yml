@@ -1,3 +1,5 @@
+# ✅ Updated mlops.yml for versioned model tracking and upload
+
 name: MLOps - Train & Upload Model to Snowflake
 
 on:
@@ -21,7 +23,7 @@ jobs:
         run: |
           pip install -r ml/requirements.txt
 
-      - name: Train ML model
+      - name: Train ML model (with versioning, signature, drift, metrics)
         run: python ml/train_model.py
         env:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
@@ -29,10 +31,10 @@ jobs:
           SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
           SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
           SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
-          SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE_STAGE }}
+          SNOWFLAKE_DATABASE: ${{ github.ref_name == 'main' && secrets.SNOWFLAKE_DATABASE_PROD || secrets.SNOWFLAKE_DATABASE_STAGE }}
           SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
 
-      - name: Upload model to Snowflake stage
+      - name: Upload versioned model + artifacts to Snowflake stage
         run: python ml/upload_model.py
         env:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
@@ -40,5 +42,5 @@ jobs:
           SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
           SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
           SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
-          SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE_STAGE }}
+          SNOWFLAKE_DATABASE: ${{ github.ref_name == 'main' && secrets.SNOWFLAKE_DATABASE_PROD || secrets.SNOWFLAKE_DATABASE_STAGE }}
           SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
