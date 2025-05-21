@@ -57,3 +57,5 @@ with gzip.open("ml/model.pkl.gz", "wb") as f:
     cloudpickle.dump(model, f)
 
 print("✅ Model trained and saved to ml/model.pkl.gz")
+
+
