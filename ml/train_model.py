@@ -42,7 +42,8 @@ X = df.drop("I_CATEGORY_ID", axis=1)
 y = df["I_CATEGORY_ID"]
 X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=42)
 
-model = RandomForestClassifier(n_estimators=100)
+# model = RandomForestClassifier(n_estimators=100)
+model = RandomForestClassifier(n_estimators=500, random_state=42)
 model.fit(X_train, y_train)
 
 # Save base artifacts (no version yet)
