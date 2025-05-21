@@ -1,5 +1,3 @@
-# ✅ Updated upload_model.py with Snowflake logging and champion selection logic
-
 import os
 import json
 import snowflake.connector
@@ -8,7 +6,6 @@ import snowflake.connector
 with open("ml/version.txt", "r") as v:
     model_version = v.read().strip()
 
-# Define file list
 files_to_upload = [
     f"ml/model_v{model_version}.pkl.gz",
     f"ml/signature_v{model_version}.json",
@@ -16,7 +13,6 @@ files_to_upload = [
     f"ml/metrics_v{model_version}.json"
 ]
 
-# Snowflake stage
 stage_name = "@ml_models_stage"
 
 # Connect to Snowflake
@@ -32,7 +28,6 @@ conn = snowflake.connector.connect(
 
 cursor = conn.cursor()
 try:
-    # Upload model artifacts
     for file_path in files_to_upload:
         put_command = f"PUT file://{file_path} {stage_name} OVERWRITE=TRUE;"
         print(f"📦 Uploading {file_path} to Snowflake stage...")
@@ -40,7 +35,7 @@ try:
 
     print("✅ All artifacts uploaded successfully!")
 
-    # Load and log metrics
+    # Load metrics and log to Snowflake
     with open(f"ml/metrics_v{model_version}.json", "r") as f:
         metrics = json.load(f)
 
@@ -54,7 +49,7 @@ try:
     print("📝 Logging model to MODEL_HISTORY...")
     cursor.execute(insert_sql)
 
-    # Champion selection
+    # Champion selection logic
     print("🔍 Selecting new champion model...")
     cursor.execute("UPDATE MODEL_HISTORY SET IS_CHAMPION = FALSE;")
     cursor.execute("""
