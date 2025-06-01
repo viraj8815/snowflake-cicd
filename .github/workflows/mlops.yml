@@ -1,11 +1,12 @@
-name: MLOps - Train & Upload Model to Snowflake
+name: Snowflake MLOps Pipeline with MLflow
 
 on:
   push:
-    branches: [stage, main]
+    branches:
+      - stage
 
 jobs:
-  mlops:
+  train-and-track:
     runs-on: ubuntu-latest
 
     steps:
@@ -15,30 +16,26 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: 3.11
+          python-version: '3.11'
 
       - name: Install dependencies
         run: |
-          pip install -r ml/requirements.txt
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-      - name: Train ML model (with versioning, signature, drift, metrics)
-        run: python ml/train_model.py
-        env:
-          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
-          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
-          SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
-          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
-          SNOWFLAKE_DATABASE: ${{ github.ref_name == 'main' && secrets.SNOWFLAKE_DATABASE_PROD || secrets.SNOWFLAKE_DATABASE_STAGE }}
-          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
+      - name: Train model with MLflow and Snowpark
+        run: |
+          python train_model.py
 
-      - name: Upload versioned model + artifacts to Snowflake stage
-        run: python ml/upload_model.py
-        env:
-          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
-          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
-          SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
-          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
-          SNOWFLAKE_DATABASE: ${{ github.ref_name == 'main' && secrets.SNOWFLAKE_DATABASE_PROD || secrets.SNOWFLAKE_DATABASE_STAGE }}
-          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
+      - name: Upload model and deploy UDF
+        run: |
+          python upload_model.py
+
+    env:
+      SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+      SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+      SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+      SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
+      SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
+      SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}

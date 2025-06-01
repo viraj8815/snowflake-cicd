@@ -1,76 +1,102 @@
-# ✅ Finalized train_model.py (always save as base files; versioning handled in upload_model.py)
-
+from snowflake.snowpark import Session
+from snowflake.snowpark.functions import col, when
+import os
 import pandas as pd
+import mlflow
+import mlflow.sklearn
+import uuid, cloudpickle, gzip, json
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
-import cloudpickle, gzip, os, json
-import snowflake.connector
 
-# Connect to Snowflake
-conn = snowflake.connector.connect(
-    user=os.environ["SNOWFLAKE_USER"],
-    password=os.environ["SNOWFLAKE_PASSWORD"],
-    account=os.environ["SNOWFLAKE_ACCOUNT"],
-    warehouse=os.environ["SNOWFLAKE_WAREHOUSE"],
-    database=os.environ["SNOWFLAKE_DATABASE"],
-    schema=os.environ["SNOWFLAKE_SCHEMA"],
-    role=os.environ["SNOWFLAKE_ROLE"]
+# Snowflake connection
+connection_parameters = {
+    "user": os.environ["SNOWFLAKE_USER"],
+    "password": os.environ["SNOWFLAKE_PASSWORD"],
+    "account": os.environ["SNOWFLAKE_ACCOUNT"],
+    "warehouse": os.environ["SNOWFLAKE_WAREHOUSE"],
+    "database": os.environ["SNOWFLAKE_DATABASE"],
+    "schema": os.environ["SNOWFLAKE_SCHEMA"],
+    "role": os.environ["SNOWFLAKE_ROLE"]
+}
+
+session = Session.builder.configs(connection_parameters).create()
+
+# Load tables from marketplace
+cs = session.table("TPCDS_10TD.CATALOG_SALES")
+cu = session.table("TPCDS_10TD.CUSTOMER")
+dt = session.table("TPCDS_10TD.DATE_DIM")
+
+# Join them together
+df = (
+    cs.join(cu, cs["cs_bill_customer_sk"] == cu["c_customer_sk"])
+      .join(dt, cs["cs_sold_date_sk"] == dt["d_date_sk"])
+      .select(
+          cs["cs_sales_price"],
+          cs["cs_quantity"],
+          cs["cs_ext_discount_amt"],
+          cs["cs_net_profit"],
+          dt["d_year"],
+          dt["d_month_seq"],
+          dt["d_week_seq"],
+          cu["c_birth_year"],
+          cu["c_current_cdemo_sk"].alias("label")
+      )
+      .filter(cs["cs_sales_price"].is_not_null())
+      .filter(cs["cs_quantity"].is_not_null())
+      .filter(cs["cs_net_profit"].is_not_null())
+      .limit(10000)
 )
-cursor = conn.cursor()
 
-# Fetch training data
-query = """
-SELECT
-    SS_SALES_PRICE,
-    SS_QUANTITY,
-    SS_EXT_DISCOUNT_AMT,
-    SS_NET_PROFIT,
-    D_YEAR,
-    D_MONTH,
-    D_DAY,
-    S_CLOSED_DATE_SK,
-    I_CATEGORY_ID
-FROM ML_DB.TRAINING_DATA.STORE_CUSTOMER_SALES_SAMPLE
-LIMIT 10000;
-"""
-df = pd.read_sql(query, conn)
-conn.close()
-df = df.dropna(subset=["I_CATEGORY_ID"])
+# Add derived features
+df = df.with_column("profit_ratio", col("cs_net_profit") / col("cs_sales_price"))
 
-X = df.drop("I_CATEGORY_ID", axis=1)
-y = df["I_CATEGORY_ID"]
+# Convert to pandas
+pandas_df = df.to_pandas()
+
+# ML Training
+pandas_df = pandas_df.dropna(subset=["label"])
+X = pandas_df.drop("label", axis=1)
+y = pandas_df["label"]
 X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=42)
 
-# model = RandomForestClassifier(n_estimators=100)
-model = RandomForestClassifier(n_estimators=500, random_state=42)
-model.fit(X_train, y_train)
+run_id = str(uuid.uuid4())
+mlflow.set_tracking_uri("file:///ml/mlruns")
+mlflow.set_experiment("snowflake-mlops-pipeline")
 
-# Save base artifacts (no version yet)
-os.makedirs("ml", exist_ok=True)
-with gzip.open("ml/model.pkl.gz", "wb") as f:
-    cloudpickle.dump(model, f)
+with mlflow.start_run(run_name=f"train-{run_id}"):
+    mlflow.log_param("n_estimators", 500)
+    mlflow.log_param("random_state", 42)
 
-signature = {
-    "inputs": list(X.columns),
-    "output": "I_CATEGORY_ID",
-    "model_type": "RandomForestClassifier"
-}
-with open("ml/signature.json", "w") as f:
-    json.dump(signature, f, indent=2)
+    model = RandomForestClassifier(n_estimators=500, random_state=42)
+    model.fit(X_train, y_train)
 
-baseline_stats = df.describe().to_dict()
-with open("ml/drift_baseline.json", "w") as f:
-    json.dump(baseline_stats, f, indent=2)
+    accuracy = accuracy_score(y_test, model.predict(X_test))
+    mlflow.log_metric("accuracy", accuracy)
+    mlflow.sklearn.log_model(model, "random_forest_model")
 
-y_pred = model.predict(X_test)
-accuracy = accuracy_score(y_test, y_pred)
-metrics = {
-    "accuracy": accuracy
-}
-with open("ml/metrics.json", "w") as f:
-    json.dump(metrics, f, indent=2)
+    os.makedirs("ml", exist_ok=True)
+    with gzip.open("ml/model.pkl.gz", "wb") as f:
+        cloudpickle.dump(model, f)
 
-print(f"✅ Model trained and saved with base metrics, signature, and baseline.")
+    signature = {
+        "inputs": list(X.columns),
+        "output": "label",
+        "model_type": "RandomForestClassifier"
+    }
+    with open("ml/signature.json", "w") as f:
+        json.dump(signature, f, indent=2)
 
+    baseline_stats = pandas_df.describe().to_dict()
+    with open("ml/drift_baseline.json", "w") as f:
+        json.dump(baseline_stats, f, indent=2)
 
+    metrics = { "accuracy": accuracy }
+    with open("ml/metrics.json", "w") as f:
+        json.dump(metrics, f, indent=2)
+
+    mlflow.log_artifact("ml/signature.json")
+    mlflow.log_artifact("ml/drift_baseline.json")
+    mlflow.log_artifact("ml/metrics.json")
+
+print("✅ Model trained on 3 joined tables and tracked with MLflow.")

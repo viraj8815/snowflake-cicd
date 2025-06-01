@@ -1,8 +1,11 @@
+# ✅ Full upload_model.py with corrected UDF formatting
+
 import os
 import json
 import snowflake.connector
 import re
 
+# Connect to Snowflake
 conn = snowflake.connector.connect(
     user=os.environ["SNOWFLAKE_USER"],
     password=os.environ["SNOWFLAKE_PASSWORD"],
@@ -15,11 +18,13 @@ conn = snowflake.connector.connect(
 cursor = conn.cursor()
 
 try:
+    # Load current model metrics
     with open("ml/metrics.json", "r") as f:
         metrics = json.load(f)
 
     current_accuracy = metrics["accuracy"]
 
+    # Check current champion accuracy
     cursor.execute("""
         SELECT MAX(ACCURACY)
         FROM MODEL_HISTORY
@@ -32,6 +37,7 @@ try:
     print(f"📊 Current model accuracy: {current_accuracy}")
 
     if current_accuracy > champion_accuracy:
+        # Determine next version number (v1, v2, ...)
         cursor.execute("""
             SELECT MAX(TRY_CAST(SUBSTRING(VERSION, 2) AS INTEGER))
             FROM MODEL_HISTORY
@@ -40,16 +46,19 @@ try:
         max_version = result[0] if result[0] is not None else 0
         model_version = f"v{max_version + 1}"
 
+        # Save version to file
         with open("ml/version.txt", "w") as v:
             v.write(model_version)
 
         print(f"🔢 New model version: {model_version}")
 
+        # Rename artifacts
         os.rename("ml/model.pkl.gz", f"ml/model_{model_version}.pkl.gz")
         os.rename("ml/signature.json", f"ml/signature_{model_version}.json")
         os.rename("ml/drift_baseline.json", f"ml/drift_baseline_{model_version}.json")
         os.rename("ml/metrics.json", f"ml/metrics_{model_version}.json")
 
+        # Upload files to Snowflake stage
         files_to_upload = [
             f"ml/model_{model_version}.pkl.gz",
             f"ml/signature_{model_version}.json",
@@ -65,6 +74,7 @@ try:
 
         print("✅ All artifacts uploaded successfully!")
 
+        # Insert into MODEL_HISTORY and promote
         insert_sql = f"""
         INSERT INTO MODEL_HISTORY (VERSION, ACCURACY, IS_CHAMPION)
         SELECT '{model_version}', {current_accuracy}, FALSE;
@@ -77,20 +87,19 @@ try:
         SET IS_CHAMPION = TRUE
         WHERE VERSION = '{model_version}';
         """)
-
         print("🏆 New champion promoted.")
 
-        # ✅ Updated UDF schema
+        # Auto-redeploy Python UDF to use new champion version
         udf_sql = f"""
-CREATE OR REPLACE FUNCTION predict_customer_segment(
-    sales_price FLOAT,
-    quantity INT,
-    discount_amt FLOAT,
-    net_profit FLOAT,
+CREATE OR REPLACE FUNCTION predict_category(
+    price FLOAT,
+    qty INT,
+    discount FLOAT,
+    profit FLOAT,
     year INT,
-    month_seq INT,
-    week_seq INT,
-    birth_year INT
+    month INT,
+    day INT,
+    closed_date_sk INT
 )
 RETURNS FLOAT
 LANGUAGE PYTHON
@@ -110,8 +119,8 @@ model_path = os.path.join(
 with gzip.open(model_path, "rb") as f:
     model = cloudpickle.load(f)
 
-def predict(sales_price, quantity, discount_amt, net_profit, year, month_seq, week_seq, birth_year):
-    return float(model.predict([[sales_price, quantity, discount_amt, net_profit, year, month_seq, week_seq, birth_year]])[0])
+def predict(price, qty, discount, profit, year, month, day, closed_date_sk):
+    return float(model.predict([[price, qty, discount, profit, year, month, day, closed_date_sk]])[0])
 $$;
         """
         cursor.execute(udf_sql)

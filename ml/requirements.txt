@@ -3,3 +3,4 @@ scikit-learn
 cloudpickle
 snowflake-connector-python
 joblib
+mlflow
