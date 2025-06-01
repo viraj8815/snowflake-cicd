@@ -25,11 +25,11 @@ jobs:
 
       - name: Train model with MLflow and Snowpark
         run: |
-          python train_model.py
+          python ml/train_model.py
 
       - name: Upload model and deploy UDF
         run: |
-          python upload_model.py
+          python ml/upload_model.py
 
     env:
       SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
