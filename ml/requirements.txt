@@ -4,3 +4,4 @@ cloudpickle
 snowflake-connector-python
 joblib
 mlflow
+snowflake-snowpark-python
