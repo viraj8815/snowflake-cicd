@@ -1,7 +1,6 @@
 import os
+import json
 import snowflake.connector
-import cloudpickle
-import gzip
 
 # -----------------------------
 # Snowflake connection
@@ -18,18 +17,68 @@ conn = snowflake.connector.connect(
 cursor = conn.cursor()
 
 # -----------------------------
-# Upload model to stage
+# Upload model + artifacts to stage
 # -----------------------------
-print("📦 Uploading model to stage...")
-cursor.execute("""
-    PUT file://ml/model.pkl.gz @ml_models_stage 
-    AUTO_COMPRESS=FALSE 
-    OVERWRITE=TRUE
-""")
-print("✅ Model uploaded to Snowflake stage.")
+print("📦 Uploading model artifacts to @ml_models_stage...")
+for file in ["ml/model.pkl.gz", "ml/metrics.json", "ml/signature.json", "ml/drift_baseline.json"]:
+    cursor.execute(f"PUT file://{file} @ml_models_stage AUTO_COMPRESS=FALSE OVERWRITE=TRUE")
+    print(f"✅ Uploaded {file}")
 
 # -----------------------------
-# Create or replace UDF
+# Load accuracy from metrics.json
+# -----------------------------
+with open("ml/metrics.json") as f:
+    metrics = json.load(f)
+accuracy = float(metrics.get("accuracy", 0.0))
+
+# -----------------------------
+# Create history table if not exists
+# -----------------------------
+cursor.execute("""
+    CREATE TABLE IF NOT EXISTS STAGE_DB.PUBLIC.MODEL_HISTORY (
+        version STRING,
+        accuracy FLOAT,
+        deployed_on TIMESTAMP,
+        is_champion BOOLEAN
+    )
+""")
+
+# -----------------------------
+# Determine next version
+# -----------------------------
+cursor.execute("SELECT MAX(TRY_CAST(version AS INT)) FROM STAGE_DB.PUBLIC.MODEL_HISTORY")
+row = cursor.fetchone()
+last_version = int(row[0]) if row[0] is not None else 0
+version = str(last_version + 1)
+
+# -----------------------------
+# Insert new version as is_champion = FALSE for now
+# -----------------------------
+cursor.execute(f"""
+    INSERT INTO STAGE_DB.PUBLIC.MODEL_HISTORY 
+    (version, accuracy, deployed_on, is_champion)
+    VALUES ('{version}', {accuracy}, CURRENT_TIMESTAMP(), FALSE)
+""")
+print(f"✅ Logged version {version} with accuracy {accuracy:.4f} to MODEL_HISTORY.")
+
+# -----------------------------
+# Champion logic — set only best version as TRUE
+# -----------------------------
+cursor.execute("""
+    UPDATE STAGE_DB.PUBLIC.MODEL_HISTORY
+    SET is_champion = FALSE
+""")
+cursor.execute("""
+    UPDATE STAGE_DB.PUBLIC.MODEL_HISTORY
+    SET is_champion = TRUE
+    WHERE accuracy = (
+        SELECT MAX(accuracy) FROM STAGE_DB.PUBLIC.MODEL_HISTORY
+    )
+""")
+print("🏆 Champion model updated based on highest accuracy.")
+
+# -----------------------------
+# Deploy Python UDF
 # -----------------------------
 print("🔧 Creating or replacing Python UDF...")
 
@@ -91,5 +140,3 @@ print("✅ Python UDF deployed successfully.")
 # -----------------------------
 cursor.close()
 conn.close()
-
-
