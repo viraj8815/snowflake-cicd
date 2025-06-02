@@ -122,3 +122,4 @@ print("✅ Python UDF deployed successfully.")
 # -----------------------------
 cursor.close()
 conn.close()
+
