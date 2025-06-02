@@ -28,9 +28,9 @@ session = Session.builder.configs(connection_parameters).create()
 # -------------------------------
 # Load and Join 3 Tables
 # -------------------------------
-sales = session.table("TPCDS_10TB.TPCDS_SF10TCL.CATALOG_SALES")
-cust = session.table("TPCDS_10TB.TPCDS_SF10TCL.CUSTOMER")
-date = session.table("TPCDS_10TB.TPCDS_SF10TCL.DATE_DIM")
+sales = session.table("ML_DB.TRAINING_DATA.CATALOG_SALES_SAMPLE")
+cust = session.table("ML_DB.TRAINING_DATA.CUSTOMER_SAMPLE")
+date = session.table("ML_DB.TRAINING_DATA.DATE_DIM_SAMPLE")
 
 df = (
     sales.join(cust, sales["CS_BILL_CUSTOMER_SK"] == cust["C_CUSTOMER_SK"])
