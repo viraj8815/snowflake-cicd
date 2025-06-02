@@ -29,9 +29,9 @@ session = Session.builder.configs(connection_parameters).create()
 # -------------------------------
 # Load and Join 3 Tables
 # -------------------------------
-sales = session.table("STAGE_DB.TRAINING_DATA.CATALOG_SALES_SAMPLE")
-cust = session.table("STAGE_DB.TRAINING_DATA.CUSTOMER_SAMPLE")
-date = session.table("STAGE_DB.TRAINING_DATA.DATE_DIM_SAMPLE")
+sales = session.table("STAGE_DB.PUBLIC.CATALOG_SALES_SAMPLE")
+cust = session.table("STAGE_DB.PUBLIC.CUSTOMER_SAMPLE")
+date = session.table("STAGE_DB.PUBLIC.DATE_DIM_SAMPLE")
 
 df = (
     sales.join(cust, sales["CS_BILL_CUSTOMER_SK"] == cust["C_CUSTOMER_SK"])
