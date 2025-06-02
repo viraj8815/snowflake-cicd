@@ -10,9 +10,9 @@ from sklearn.metrics import accuracy_score
 from snowflake.snowpark import Session
 from snowflake.snowpark.functions import when
 
-# -----------------------------
+# -------------------------------
 # Snowflake connection
-# -----------------------------
+# -------------------------------
 connection_parameters = {
     "account": os.environ["SNOWFLAKE_ACCOUNT"],
     "user": os.environ["SNOWFLAKE_USER"],
@@ -25,9 +25,9 @@ connection_parameters = {
 
 session = Session.builder.configs(connection_parameters).create()
 
-# -----------------------------
-# Load and Join 3 Sample Tables
-# -----------------------------
+# -------------------------------
+# Load and Join 3 Tables
+# -------------------------------
 sales = session.table("ML_DB.TRAINING_DATA.CATALOG_SALES_SAMPLE")
 cust = session.table("ML_DB.TRAINING_DATA.CUSTOMER_SAMPLE")
 date = session.table("ML_DB.TRAINING_DATA.DATE_DIM_SAMPLE")
@@ -62,53 +62,49 @@ df = (
          )
 )
 
-# -----------------------------
-# Debug logging
-# -----------------------------
-print("🔍 Preview of joined Snowpark DataFrame:")
-df.show(5)
-
-# -----------------------------
+# -------------------------------
 # Convert to Pandas
-# -----------------------------
+# -------------------------------
 pdf = df.to_pandas()
-pdf.rename(columns={"C_CURRENT_CDEMO_SK": "label"}, inplace=True)
-pdf.dropna(subset=["label"], inplace=True)
+pdf.columns = [col.lower() for col in pdf.columns]
+pdf.rename(columns={"c_current_cdemo_sk": "label"}, inplace=True)
 
-print(f"✅ Rows available for training: {len(pdf)}")
+print("🔍 Preview of joined Snowpark DataFrame:")
+print(pdf.head())
+print("✅ Rows available for training:", len(pdf))
+
+pdf.dropna(subset=["label"], inplace=True)
 if len(pdf) == 0:
     raise ValueError("❌ No rows available for training.")
 
-# -----------------------------
-# Feature engineering
-# -----------------------------
 X = pdf.drop("label", axis=1)
 y = pdf["label"]
 
-X = pd.get_dummies(X, columns=["age_group", "D_DAY_NAME"])
+# Verify and encode categorical features
+print("📊 Columns before encoding:", X.columns.tolist())
+X = pd.get_dummies(X, columns=["age_group", "d_day_name"])
 
-# -----------------------------
-# Model training
-# -----------------------------
+# -------------------------------
+# Train model
+# -------------------------------
 X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=42)
-
 model = RandomForestClassifier(n_estimators=100, random_state=42)
 model.fit(X_train, y_train)
 y_pred = model.predict(X_test)
 accuracy = accuracy_score(y_test, y_pred)
 
-# -----------------------------
-# MLflow tracking
-# -----------------------------
+# -------------------------------
+# MLflow Tracking
+# -------------------------------
 mlflow.set_experiment("snowflake-ml-model")
 with mlflow.start_run():
     mlflow.log_param("model_type", "RandomForestClassifier")
     mlflow.log_metric("accuracy", accuracy)
     mlflow.sklearn.log_model(model, artifact_path="model")
 
-# -----------------------------
-# Save model + artifacts
-# -----------------------------
+# -------------------------------
+# Save Artifacts
+# -------------------------------
 os.makedirs("ml", exist_ok=True)
 
 with gzip.open("ml/model.pkl.gz", "wb") as f:
@@ -127,4 +123,4 @@ with open("ml/metrics.json", "w") as f:
 with open("ml/drift_baseline.json", "w") as f:
     json.dump(pdf.describe().to_dict(), f, indent=2)
 
-print("✅ Model trained, tracked, and saved.")
+print("✅ Model trained, tracked with MLflow, and artifacts saved.")
