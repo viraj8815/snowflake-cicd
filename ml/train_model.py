@@ -72,6 +72,9 @@ if len(pdf) == 0:
 X = pdf.drop("label", axis=1)
 y = pdf["label"]
 
+# Convert categorical variables to numeric (one-hot encoding)
+X = pd.get_dummies(X, columns=["age_group", "D_DAY_NAME"])
+
 X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=42)
 
 # -------------------------------
