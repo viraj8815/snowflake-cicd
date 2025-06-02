@@ -19,7 +19,7 @@ connection_parameters = {
     "password": os.environ["SNOWFLAKE_PASSWORD"],
     "role": os.environ["SNOWFLAKE_ROLE"],
     "warehouse": os.environ["SNOWFLAKE_WAREHOUSE"],
-    "database": os.environ["SNOWFLAKE_DATABASE"],  # uses env like SNOWFLAKE_DATABASE_PROD/STAGE
+    "database": os.environ["SNOWFLAKE_DATABASE"],
     "schema": os.environ["SNOWFLAKE_SCHEMA"]
 }
 
@@ -35,15 +35,15 @@ date = session.table("ML_DB.TRAINING_DATA.DATE_DIM_SAMPLE")
 df = (
     sales.join(cust, sales["CS_BILL_CUSTOMER_SK"] == cust["C_CUSTOMER_SK"])
          .join(date, sales["CS_SOLD_DATE_SK"] == date["D_DATE_SK"])
-         .with_column("profit_ratio",
+         .with_column("PROFIT_RATIO",
                       when(sales["CS_SALES_PRICE"] != 0,
                            sales["CS_NET_PROFIT"] / sales["CS_SALES_PRICE"])
                       .otherwise(0))
-         .with_column("age_group",
+         .with_column("AGE_GROUP",
                       when(cust["C_BIRTH_YEAR"] <= 1980, "GenX")
                       .when(cust["C_BIRTH_YEAR"] <= 2000, "Millennial")
                       .otherwise("GenZ"))
-         .with_column("is_weekend",
+         .with_column("IS_WEEKEND",
                       when(date["D_DAY_NAME"].isin(["Saturday", "Sunday"]), 1)
                       .otherwise(0))
          .select(
@@ -56,11 +56,11 @@ df = (
              date["D_DAY_NAME"],
              cust["C_BIRTH_YEAR"],
              cust["C_CURRENT_CDEMO_SK"],
-             "profit_ratio",
-             "age_group",
-             "is_weekend"
+             "PROFIT_RATIO",
+             "AGE_GROUP",
+             "IS_WEEKEND"
          )
-         .limit(5000)  # Limit to avoid long runtime and memory overload
+         .limit(5000)
 )
 
 # -------------------------------
@@ -70,6 +70,8 @@ pdf = df.to_pandas()
 pdf.rename(columns={"C_CURRENT_CDEMO_SK": "label"}, inplace=True)
 pdf.dropna(subset=["label"], inplace=True)
 
+print(f"✅ Rows available for training: {len(pdf)}")
+
 if len(pdf) == 0:
     raise ValueError("❌ No rows available for training.")
 
@@ -77,7 +79,7 @@ X = pdf.drop("label", axis=1)
 y = pdf["label"]
 
 # Convert categorical features
-X = pd.get_dummies(X, columns=["age_group", "D_DAY_NAME"])
+X = pd.get_dummies(X, columns=["AGE_GROUP", "D_DAY_NAME"])
 
 # -------------------------------
 # Train model
