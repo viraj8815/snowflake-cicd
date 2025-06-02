@@ -29,37 +29,35 @@ sales = session.table("ML_DB.TRAINING_DATA.STORE_CUSTOMER_SALES_SAMPLE")
 cust = session.table("ML_DB.TRAINING_DATA.CUSTOMER_SAMPLE")
 date = session.table("ML_DB.TRAINING_DATA.DATE_SAMPLE")
 
-# Join sales + customer
-df = sales.join(cust, sales["SS_CUSTOMER_SK"] == cust["C_CUSTOMER_SK"])
+df = (
+    sales.join(cust, sales["SS_CUSTOMER_SK"] == cust["C_CUSTOMER_SK"])
+         .join(date, (sales["D_YEAR"] == date["D_YEAR"]) & ((date["D_MONTH_SEQ"] % 12) == sales["D_MONTH"]))
+         .select(
+             sales["SS_SALES_PRICE"],
+             sales["SS_QUANTITY"],
+             sales["SS_EXT_DISCOUNT_AMT"],
+             sales["SS_NET_PROFIT"],
+             sales["D_YEAR"],
+             sales["D_MONTH"],
+             sales["D_DAY"],
+             cust["C_BIRTH_YEAR"],
+             cust["C_CURRENT_CDEMO_SK"],
+             date["D_DAY_NAME"]
+         )
+         .with_column("profit_ratio", sales["SS_NET_PROFIT"] / sales["SS_SALES_PRICE"])
+         .with_column("age_group",
+                      when(cust["C_BIRTH_YEAR"] <= 1980, "GenX")
+                      .when(cust["C_BIRTH_YEAR"] <= 2000, "Millennial")
+                      .otherwise("GenZ"))
+         .with_column("is_weekend",
+                      when(date["D_DAY_NAME"].isin(["Saturday", "Sunday"]), 1).otherwise(0))
+)
 
-# Approximate join with date: year and month match
-df = df.join(date, (sales["D_YEAR"] == date["D_YEAR"]) & 
-                   ((date["D_MONTH_SEQ"] % 12) == sales["D_MONTH"]))
-
-# Select + engineer features
-df = df.select(
-        sales["SS_SALES_PRICE"],
-        sales["SS_QUANTITY"],
-        sales["SS_EXT_DISCOUNT_AMT"],
-        sales["SS_NET_PROFIT"],
-        sales["D_YEAR"],
-        sales["D_MONTH"],
-        sales["D_DAY"],
-        cust["C_BIRTH_YEAR"],
-        cust["C_CURRENT_CDEMO_SK"].alias("label"),
-        date["D_DAY_NAME"]
-    ) \
-    .with_column("profit_ratio", sales["SS_NET_PROFIT"] / sales["SS_SALES_PRICE"]) \
-    .with_column("age_group", 
-                 when(cust["C_BIRTH_YEAR"] <= 1980, "GenX")
-                 .when(cust["C_BIRTH_YEAR"] <= 2000, "Millennial")
-                 .otherwise("GenZ")) \
-    .with_column("is_weekend", 
-                 when(date["D_DAY_NAME"].isin(["Saturday", "Sunday"]), 1).otherwise(0))
-
-# Convert to pandas
+# Convert to pandas and prepare label
 pdf = df.to_pandas()
-pdf = pdf.dropna(subset=["label"])
+pdf.rename(columns={"C_CURRENT_CDEMO_SK": "label"}, inplace=True)
+pdf.dropna(subset=["label"], inplace=True)
+
 X = pdf.drop("label", axis=1)
 y = pdf["label"]
 X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=42)
@@ -104,4 +102,4 @@ with mlflow.start_run(run_name=f"train-{run_id}"):
     mlflow.log_artifact("ml/drift_baseline.json")
     mlflow.log_artifact("ml/metrics.json")
 
-print("✅ Model trained using 3 tables with feature engineering and tracked via MLflow.")
+print("✅ Model trained using all 3 tables (no aliasing) and tracked via MLflow.")
