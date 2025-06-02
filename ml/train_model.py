@@ -8,10 +8,10 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 from snowflake.snowpark import Session
-from snowflake.snowpark.functions import when, col
+from snowflake.snowpark.functions import when
 
 # -------------------------------
-# Snowflake connection parameters
+# Snowflake connection
 # -------------------------------
 connection_parameters = {
     "account": os.environ["SNOWFLAKE_ACCOUNT"],
@@ -46,17 +46,21 @@ df = (
              cust["C_BIRTH_YEAR"],
              cust["C_CURRENT_CDEMO_SK"]
          )
-         .with_column("profit_ratio", sales["CS_NET_PROFIT"] / sales["CS_SALES_PRICE"])
+         .with_column("profit_ratio",
+                      when(sales["CS_SALES_PRICE"] != 0,
+                           sales["CS_NET_PROFIT"] / sales["CS_SALES_PRICE"])
+                      .otherwise(0))
          .with_column("age_group",
                       when(cust["C_BIRTH_YEAR"] <= 1980, "GenX")
                       .when(cust["C_BIRTH_YEAR"] <= 2000, "Millennial")
                       .otherwise("GenZ"))
          .with_column("is_weekend",
-                      when(date["D_DAY_NAME"].isin(["Saturday", "Sunday"]), 1).otherwise(0))
+                      when(date["D_DAY_NAME"].isin(["Saturday", "Sunday"]), 1)
+                      .otherwise(0))
 )
 
 # -------------------------------
-# Convert to Pandas & clean
+# Convert to Pandas
 # -------------------------------
 pdf = df.to_pandas()
 pdf.rename(columns={"C_CURRENT_CDEMO_SK": "label"}, inplace=True)
@@ -79,7 +83,7 @@ y_pred = model.predict(X_test)
 accuracy = accuracy_score(y_test, y_pred)
 
 # -------------------------------
-# MLflow tracking
+# MLflow Tracking
 # -------------------------------
 mlflow.set_experiment("snowflake-ml-model")
 with mlflow.start_run():
@@ -88,7 +92,7 @@ with mlflow.start_run():
     mlflow.sklearn.log_model(model, artifact_path="model")
 
 # -------------------------------
-# Save artifacts
+# Save Artifacts
 # -------------------------------
 os.makedirs("ml", exist_ok=True)
 
