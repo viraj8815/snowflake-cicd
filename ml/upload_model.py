@@ -139,24 +139,24 @@ if str(champion_version) == str(new_version):
     IMPORTS = ('@ml_models_stage/model.pkl.gz')
     AS
     $$
-    import cloudpickle, gzip, os, sys
-    model_path = os.path.join(sys._xoptions["snowflake_import_directory"], "model.pkl.gz")
-    with gzip.open(model_path, "rb") as f:
-        model = cloudpickle.load(f)
+import cloudpickle, gzip, os, sys
+model_path = os.path.join(sys._xoptions["snowflake_import_directory"], "model.pkl.gz")
+with gzip.open(model_path, "rb") as f:
+    model = cloudpickle.load(f)
 
-    def predict(CS_SALES_PRICE, CS_QUANTITY, CS_EXT_DISCOUNT_AMT, CS_NET_PROFIT,
-                D_YEAR, D_MONTH_SEQ, C_BIRTH_YEAR, PROFIT_RATIO, IS_WEEKEND,
-                AGE_GROUP_GENX, AGE_GROUP_MILLENNIAL, AGE_GROUP_GENZ,
-                D_DAY_NAME_FRIDAY, D_DAY_NAME_MONDAY, D_DAY_NAME_SATURDAY, D_DAY_NAME_SUNDAY,
-                D_DAY_NAME_THURSDAY, D_DAY_NAME_TUESDAY, D_DAY_NAME_WEDNESDAY):
-        features = [[
-            CS_SALES_PRICE, CS_QUANTITY, CS_EXT_DISCOUNT_AMT, CS_NET_PROFIT,
+def predict(CS_SALES_PRICE, CS_QUANTITY, CS_EXT_DISCOUNT_AMT, CS_NET_PROFIT,
             D_YEAR, D_MONTH_SEQ, C_BIRTH_YEAR, PROFIT_RATIO, IS_WEEKEND,
             AGE_GROUP_GENX, AGE_GROUP_MILLENNIAL, AGE_GROUP_GENZ,
             D_DAY_NAME_FRIDAY, D_DAY_NAME_MONDAY, D_DAY_NAME_SATURDAY, D_DAY_NAME_SUNDAY,
-            D_DAY_NAME_THURSDAY, D_DAY_NAME_TUESDAY, D_DAY_NAME_WEDNESDAY
-        ]]
-        return float(model.predict(features)[0])
+            D_DAY_NAME_THURSDAY, D_DAY_NAME_TUESDAY, D_DAY_NAME_WEDNESDAY):
+    features = [[
+        CS_SALES_PRICE, CS_QUANTITY, CS_EXT_DISCOUNT_AMT, CS_NET_PROFIT,
+        D_YEAR, D_MONTH_SEQ, C_BIRTH_YEAR, PROFIT_RATIO, IS_WEEKEND,
+        AGE_GROUP_GENX, AGE_GROUP_MILLENNIAL, AGE_GROUP_GENZ,
+        D_DAY_NAME_FRIDAY, D_DAY_NAME_MONDAY, D_DAY_NAME_SATURDAY, D_DAY_NAME_SUNDAY,
+        D_DAY_NAME_THURSDAY, D_DAY_NAME_TUESDAY, D_DAY_NAME_WEDNESDAY
+    ]]
+    return float(model.predict(features)[0])
     $$;
     """)
     print("✅ UDF updated to use best performing model.")
@@ -175,3 +175,4 @@ with open(history_file, "w") as f:
 # -----------------------------
 cursor.close()
 conn.close()
+
