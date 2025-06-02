@@ -1,4 +1,5 @@
 pandas
+numpy
 scikit-learn
 cloudpickle
 snowflake-connector-python

@@ -1,7 +1,6 @@
 import os
 import json
 import snowflake.connector
-import re
 
 conn = snowflake.connector.connect(
     user=os.environ["SNOWFLAKE_USER"],
@@ -20,22 +19,12 @@ try:
 
     current_accuracy = metrics["accuracy"]
 
-    cursor.execute("""
-        SELECT MAX(ACCURACY)
-        FROM MODEL_HISTORY
-        WHERE IS_CHAMPION = TRUE
-    """)
+    cursor.execute("SELECT MAX(ACCURACY) FROM MODEL_HISTORY WHERE IS_CHAMPION = TRUE")
     result = cursor.fetchone()
     champion_accuracy = result[0] if result[0] is not None else -1
 
-    print(f"🔍 Champion accuracy: {champion_accuracy}")
-    print(f"📊 Current model accuracy: {current_accuracy}")
-
     if current_accuracy > champion_accuracy:
-        cursor.execute("""
-            SELECT MAX(TRY_CAST(SUBSTRING(VERSION, 2) AS INTEGER))
-            FROM MODEL_HISTORY
-        """)
+        cursor.execute("SELECT MAX(TRY_CAST(SUBSTRING(VERSION, 2) AS INTEGER)) FROM MODEL_HISTORY")
         result = cursor.fetchone()
         max_version = result[0] if result[0] is not None else 0
         model_version = f"v{max_version + 1}"
@@ -43,44 +32,26 @@ try:
         with open("ml/version.txt", "w") as v:
             v.write(model_version)
 
-        print(f"🔢 New model version: {model_version}")
-
         os.rename("ml/model.pkl.gz", f"ml/model_{model_version}.pkl.gz")
         os.rename("ml/signature.json", f"ml/signature_{model_version}.json")
         os.rename("ml/drift_baseline.json", f"ml/drift_baseline_{model_version}.json")
         os.rename("ml/metrics.json", f"ml/metrics_{model_version}.json")
 
-        files_to_upload = [
+        for file in [
             f"ml/model_{model_version}.pkl.gz",
             f"ml/signature_{model_version}.json",
             f"ml/drift_baseline_{model_version}.json",
             f"ml/metrics_{model_version}.json"
-        ]
+        ]:
+            cursor.execute(f"PUT file://{file} @ml_models_stage OVERWRITE=TRUE")
 
-        stage_name = "@ml_models_stage"
-        for file_path in files_to_upload:
-            put_command = f"PUT file://{file_path} {stage_name} OVERWRITE=TRUE;"
-            print(f"📦 Uploading {file_path} to Snowflake stage...")
-            cursor.execute(put_command)
-
-        print("✅ All artifacts uploaded successfully!")
-
-        insert_sql = f"""
-        INSERT INTO MODEL_HISTORY (VERSION, ACCURACY, IS_CHAMPION)
-        SELECT '{model_version}', {current_accuracy}, FALSE;
-        """
-        cursor.execute(insert_sql)
-
-        cursor.execute("UPDATE MODEL_HISTORY SET IS_CHAMPION = FALSE;")
         cursor.execute(f"""
-        UPDATE MODEL_HISTORY
-        SET IS_CHAMPION = TRUE
-        WHERE VERSION = '{model_version}';
+            INSERT INTO MODEL_HISTORY (VERSION, ACCURACY, IS_CHAMPION)
+            SELECT '{model_version}', {current_accuracy}, FALSE;
         """)
+        cursor.execute("UPDATE MODEL_HISTORY SET IS_CHAMPION = FALSE;")
+        cursor.execute(f"UPDATE MODEL_HISTORY SET IS_CHAMPION = TRUE WHERE VERSION = '{model_version}';")
 
-        print("🏆 New champion promoted.")
-
-        # ✅ Updated UDF schema
         udf_sql = f"""
 CREATE OR REPLACE FUNCTION predict_customer_segment(
     sales_price FLOAT,
@@ -88,9 +59,11 @@ CREATE OR REPLACE FUNCTION predict_customer_segment(
     discount_amt FLOAT,
     net_profit FLOAT,
     year INT,
-    month_seq INT,
-    week_seq INT,
-    birth_year INT
+    month INT,
+    day INT,
+    birth_year INT,
+    profit_ratio FLOAT,
+    is_weekend INT
 )
 RETURNS FLOAT
 LANGUAGE PYTHON
@@ -101,25 +74,17 @@ IMPORTS = ('@ml_models_stage/model_{model_version}.pkl.gz')
 AS
 $$
 import cloudpickle, gzip, sys, os
-
-model_path = os.path.join(
-    sys._xoptions["snowflake_import_directory"],
-    "model_{model_version}.pkl.gz"
-)
-
+model_path = os.path.join(sys._xoptions["snowflake_import_directory"], "model_{model_version}.pkl.gz")
 with gzip.open(model_path, "rb") as f:
     model = cloudpickle.load(f)
-
-def predict(sales_price, quantity, discount_amt, net_profit, year, month_seq, week_seq, birth_year):
-    return float(model.predict([[sales_price, quantity, discount_amt, net_profit, year, month_seq, week_seq, birth_year]])[0])
+def predict(sales_price, quantity, discount_amt, net_profit, year, month, day, birth_year, profit_ratio, is_weekend):
+    return float(model.predict([[sales_price, quantity, discount_amt, net_profit, year, month, day, birth_year, profit_ratio, is_weekend]])[0])
 $$;
-        """
+"""
         cursor.execute(udf_sql)
-        print("🔁 Auto-redeployed UDF for new champion model.")
-
+        print("✅ New champion promoted and UDF updated.")
     else:
-        print("❌ Accuracy not improved. Skipping versioning and promotion.")
-
+        print("⚠️ Model did not outperform current champion.")
 finally:
     cursor.close()
     conn.close()

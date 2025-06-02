@@ -1,15 +1,17 @@
-from snowflake.snowpark import Session
-from snowflake.snowpark.functions import col, when
 import os
 import pandas as pd
 import mlflow
 import mlflow.sklearn
-import uuid, cloudpickle, gzip, json
+import uuid
+import cloudpickle, gzip, json
+from datetime import datetime
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
+from snowflake.snowpark import Session
+from snowflake.snowpark.functions import col, when
 
-# Snowflake connection
+# Snowflake connection using Snowpark
 connection_parameters = {
     "user": os.environ["SNOWFLAKE_USER"],
     "password": os.environ["SNOWFLAKE_PASSWORD"],
@@ -22,44 +24,42 @@ connection_parameters = {
 
 session = Session.builder.configs(connection_parameters).create()
 
-# Load tables from marketplace
-cs = session.table("TPCDS_10TD.CATALOG_SALES")
-cu = session.table("TPCDS_10TD.CUSTOMER")
-dt = session.table("TPCDS_10TD.DATE_DIM")
+# Load and join tables
+sales = session.table("ML_DB.TRAINING_DATA.STORE_CUSTOMER_SALES_SAMPLE")
+cust = session.table("ML_DB.TRAINING_DATA.CUSTOMER_SAMPLE")
+date = session.table("ML_DB.TRAINING_DATA.DATE_SAMPLE")
 
-# Join them together
 df = (
-    cs.join(cu, cs["cs_bill_customer_sk"] == cu["c_customer_sk"])
-      .join(dt, cs["cs_sold_date_sk"] == dt["d_date_sk"])
-      .select(
-          cs["cs_sales_price"],
-          cs["cs_quantity"],
-          cs["cs_ext_discount_amt"],
-          cs["cs_net_profit"],
-          dt["d_year"],
-          dt["d_month_seq"],
-          dt["d_week_seq"],
-          cu["c_birth_year"],
-          cu["c_current_cdemo_sk"].alias("label")
-      )
-      .filter(cs["cs_sales_price"].is_not_null())
-      .filter(cs["cs_quantity"].is_not_null())
-      .filter(cs["cs_net_profit"].is_not_null())
-      .limit(10000)
+    sales.join(cust, sales["SS_CUSTOMER_SK"] == cust["C_CUSTOMER_SK"])
+         .join(date, sales["S_SOLD_DATE_SK"] == date["D_DATE_SK"])
+         .select(
+             sales["SS_SALES_PRICE"],
+             sales["SS_QUANTITY"],
+             sales["SS_EXT_DISCOUNT_AMT"],
+             sales["SS_NET_PROFIT"],
+             date["D_YEAR"],
+             date["D_MONTH"],
+             date["D_DAY"],
+             cust["C_BIRTH_YEAR"],
+             cust["C_CURRENT_CDEMO_SK"].alias("label")
+         )
+         .with_column("profit_ratio", sales["SS_NET_PROFIT"] / sales["SS_SALES_PRICE"])
+         .with_column("age_group",
+                      when(cust["C_BIRTH_YEAR"] <= 1980, "GenX")
+                      .when(cust["C_BIRTH_YEAR"] <= 2000, "Millennial")
+                      .otherwise("GenZ"))
+         .with_column("is_weekend",
+                      when(date["D_DAY"].isin(["Saturday", "Sunday"]), 1).otherwise(0))
 )
 
-# Add derived features
-df = df.with_column("profit_ratio", col("cs_net_profit") / col("cs_sales_price"))
-
 # Convert to pandas
-pandas_df = df.to_pandas()
-
-# ML Training
-pandas_df = pandas_df.dropna(subset=["label"])
-X = pandas_df.drop("label", axis=1)
-y = pandas_df["label"]
+pdf = df.to_pandas()
+pdf = pdf.dropna(subset=["label"])
+X = pdf.drop("label", axis=1)
+y = pdf["label"]
 X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=42)
 
+# MLflow experiment tracking
 run_id = str(uuid.uuid4())
 mlflow.set_tracking_uri("file:///ml/mlruns")
 mlflow.set_experiment("snowflake-mlops-pipeline")
@@ -87,7 +87,7 @@ with mlflow.start_run(run_name=f"train-{run_id}"):
     with open("ml/signature.json", "w") as f:
         json.dump(signature, f, indent=2)
 
-    baseline_stats = pandas_df.describe().to_dict()
+    baseline_stats = pdf.describe().to_dict()
     with open("ml/drift_baseline.json", "w") as f:
         json.dump(baseline_stats, f, indent=2)
 
@@ -99,4 +99,4 @@ with mlflow.start_run(run_name=f"train-{run_id}"):
     mlflow.log_artifact("ml/drift_baseline.json")
     mlflow.log_artifact("ml/metrics.json")
 
-print("✅ Model trained on 3 joined tables and tracked with MLflow.")
+print("✅ Model trained using 3 tables with feature engineering and tracked via MLflow.")
