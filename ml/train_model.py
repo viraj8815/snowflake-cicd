@@ -7,6 +7,7 @@ import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
+from mlflow.models.signature import infer_signature
 from snowflake.snowpark import Session
 from snowflake.snowpark.functions import when
 
