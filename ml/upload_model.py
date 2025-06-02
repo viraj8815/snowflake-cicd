@@ -17,72 +17,64 @@ conn = snowflake.connector.connect(
 cursor = conn.cursor()
 
 # -----------------------------
-# Upload model + artifacts to stage
-# -----------------------------
-print("📦 Uploading model artifacts to @ml_models_stage...")
-for file in ["ml/model.pkl.gz", "ml/metrics.json", "ml/signature.json", "ml/drift_baseline.json"]:
-    cursor.execute(f"PUT file://{file} @ml_models_stage AUTO_COMPRESS=FALSE OVERWRITE=TRUE")
-    print(f"✅ Uploaded {file}")
-
-# -----------------------------
 # Load accuracy from metrics.json
 # -----------------------------
 with open("ml/metrics.json") as f:
     metrics = json.load(f)
-accuracy = float(metrics.get("accuracy", 0.0))
+new_accuracy = float(metrics.get("accuracy", 0.0))
 
 # -----------------------------
-# Create history table if not exists
+# Create MODEL_HISTORY table if not exists
 # -----------------------------
 cursor.execute("""
     CREATE TABLE IF NOT EXISTS STAGE_DB.PUBLIC.MODEL_HISTORY (
         version STRING,
         accuracy FLOAT,
         deployed_on TIMESTAMP,
-        is_champion BOOLEAN
+        is_champion BOOLEAN,
+        model_path STRING
     )
 """)
 
 # -----------------------------
-# Determine next version
+# Set version = '1' manually for first run
 # -----------------------------
-cursor.execute("SELECT MAX(TRY_CAST(version AS INT)) FROM STAGE_DB.PUBLIC.MODEL_HISTORY")
-row = cursor.fetchone()
-last_version = int(row[0]) if row[0] is not None else 0
-version = str(last_version + 1)
+version = "1"
 
 # -----------------------------
-# Insert new version as is_champion = FALSE for now
+# Upload artifacts with versioned names
 # -----------------------------
+print(f"📦 Uploading artifacts for version {version}...")
+
+artifacts = {
+    f"ml/model.pkl.gz": f"model_v{version}.pkl.gz",
+    f"ml/metrics.json": f"metrics_v{version}.json",
+    f"ml/signature.json": f"signature_v{version}.json",
+    f"ml/drift_baseline.json": f"drift_baseline_v{version}.json"
+}
+
+for src, dest in artifacts.items():
+    cursor.execute(f"PUT file://{src} @ml_models_stage/{dest} AUTO_COMPRESS=FALSE OVERWRITE=TRUE")
+    print(f"✅ Uploaded {dest}")
+
+# -----------------------------
+# Log v1 to MODEL_HISTORY
+# -----------------------------
+cursor.execute("UPDATE STAGE_DB.PUBLIC.MODEL_HISTORY SET is_champion = FALSE")
+
 cursor.execute(f"""
     INSERT INTO STAGE_DB.PUBLIC.MODEL_HISTORY 
-    (version, accuracy, deployed_on, is_champion)
-    VALUES ('{version}', {accuracy}, CURRENT_TIMESTAMP(), FALSE)
+    (version, accuracy, deployed_on, is_champion, model_path)
+    VALUES ('{version}', {new_accuracy}, CURRENT_TIMESTAMP(), TRUE, 'model_v{version}.pkl.gz')
 """)
-print(f"✅ Logged version {version} with accuracy {accuracy:.4f} to MODEL_HISTORY.")
+print(f"✅ Logged model version {version} with accuracy {new_accuracy:.4f} as champion.")
 
 # -----------------------------
-# Champion logic — set only best version as TRUE
-# -----------------------------
-cursor.execute("""
-    UPDATE STAGE_DB.PUBLIC.MODEL_HISTORY
-    SET is_champion = FALSE
-""")
-cursor.execute("""
-    UPDATE STAGE_DB.PUBLIC.MODEL_HISTORY
-    SET is_champion = TRUE
-    WHERE accuracy = (
-        SELECT MAX(accuracy) FROM STAGE_DB.PUBLIC.MODEL_HISTORY
-    )
-""")
-print("🏆 Champion model updated based on highest accuracy.")
-
-# -----------------------------
-# Deploy Python UDF
+# Deploy UDF pointing to v1 model
 # -----------------------------
 print("🔧 Creating or replacing Python UDF...")
 
-cursor.execute("""
+cursor.execute(f"""
 CREATE OR REPLACE FUNCTION infer_model(
     CS_SALES_PRICE FLOAT,
     CS_QUANTITY FLOAT,
@@ -109,11 +101,11 @@ LANGUAGE PYTHON
 RUNTIME_VERSION = '3.10'
 HANDLER = 'predict'
 PACKAGES = ('scikit-learn', 'cloudpickle', 'numpy')
-IMPORTS = ('@ml_models_stage/model.pkl.gz')
+IMPORTS = ('@ml_models_stage/model_v1.pkl.gz')
 AS
 $$
 import cloudpickle, gzip, os, sys
-model_path = os.path.join(sys._xoptions["snowflake_import_directory"], "model.pkl.gz")
+model_path = os.path.join(sys._xoptions["snowflake_import_directory"], "model_v1.pkl.gz")
 with gzip.open(model_path, "rb") as f:
     model = cloudpickle.load(f)
 
@@ -133,11 +125,10 @@ def predict(CS_SALES_PRICE, CS_QUANTITY, CS_EXT_DISCOUNT_AMT, CS_NET_PROFIT,
 $$;
 """)
 
-print("✅ Python UDF deployed successfully.")
+print("✅ UDF deployed using model_v1.pkl.gz")
 
 # -----------------------------
-# Cleanup
+# Done
 # -----------------------------
 cursor.close()
 conn.close()
-
