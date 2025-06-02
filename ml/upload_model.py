@@ -1,90 +1,135 @@
 import os
 import json
 import snowflake.connector
+from snowflake.connector import DictCursor
 
+# -------------------------------
+# Load environment variables
+# -------------------------------
+sf_user = os.environ["SNOWFLAKE_USER"]
+sf_password = os.environ["SNOWFLAKE_PASSWORD"]
+sf_account = os.environ["SNOWFLAKE_ACCOUNT"]
+sf_warehouse = os.environ["SNOWFLAKE_WAREHOUSE"]
+sf_database = os.environ["SNOWFLAKE_DATABASE"]
+sf_schema = os.environ["SNOWFLAKE_SCHEMA"]
+sf_role = os.environ["SNOWFLAKE_ROLE"]
+
+# -------------------------------
+# Connect to Snowflake
+# -------------------------------
 conn = snowflake.connector.connect(
-    user=os.environ["SNOWFLAKE_USER"],
-    password=os.environ["SNOWFLAKE_PASSWORD"],
-    account=os.environ["SNOWFLAKE_ACCOUNT"],
-    warehouse=os.environ["SNOWFLAKE_WAREHOUSE"],
-    database=os.environ["SNOWFLAKE_DATABASE"],
-    schema=os.environ["SNOWFLAKE_SCHEMA"],
-    role=os.environ["SNOWFLAKE_ROLE"]
+    user=sf_user,
+    password=sf_password,
+    account=sf_account,
+    warehouse=sf_warehouse,
+    database=sf_database,
+    schema=sf_schema,
+    role=sf_role
 )
-cursor = conn.cursor()
 
-try:
-    with open("ml/metrics.json", "r") as f:
-        metrics = json.load(f)
+cs = conn.cursor(DictCursor)
 
-    current_accuracy = metrics["accuracy"]
+# -------------------------------
+# Upload model artifacts to stage
+# -------------------------------
+stage = "@ml_models_stage"
+files = ["model.pkl.gz", "signature.json", "metrics.json", "drift_baseline.json"]
 
-    cursor.execute("SELECT MAX(ACCURACY) FROM MODEL_HISTORY WHERE IS_CHAMPION = TRUE")
-    result = cursor.fetchone()
-    champion_accuracy = result[0] if result[0] is not None else -1
+for file in files:
+    put_cmd = f"PUT file://ml/{file} {stage} OVERWRITE = TRUE"
+    cs.execute(put_cmd)
+    print(f"✅ Uploaded: {file} to {stage}")
 
-    if current_accuracy > champion_accuracy:
-        cursor.execute("SELECT MAX(TRY_CAST(SUBSTRING(VERSION, 2) AS INTEGER)) FROM MODEL_HISTORY")
-        result = cursor.fetchone()
-        max_version = result[0] if result[0] is not None else 0
-        model_version = f"v{max_version + 1}"
+# -------------------------------
+# Load model metrics
+# -------------------------------
+with open("ml/metrics.json") as f:
+    metrics = json.load(f)
+accuracy = metrics.get("accuracy", None)
+if accuracy is None:
+    raise ValueError("⚠️ 'accuracy' missing in metrics.json")
 
-        with open("ml/version.txt", "w") as v:
-            v.write(model_version)
+# -------------------------------
+# Create or update MODEL_HISTORY
+# -------------------------------
+cs.execute("""
+    CREATE TABLE IF NOT EXISTS MODEL_HISTORY (
+        VERSION STRING,
+        ACCURACY FLOAT,
+        TIMESTAMP TIMESTAMP,
+        IS_CHAMPION BOOLEAN
+    )
+""")
 
-        os.rename("ml/model.pkl.gz", f"ml/model_{model_version}.pkl.gz")
-        os.rename("ml/signature.json", f"ml/signature_{model_version}.json")
-        os.rename("ml/drift_baseline.json", f"ml/drift_baseline_{model_version}.json")
-        os.rename("ml/metrics.json", f"ml/metrics_{model_version}.json")
+# Find the latest version
+cs.execute("SELECT MAX(VERSION) AS LAST_VERSION FROM MODEL_HISTORY WHERE VERSION LIKE 'v%'")
+row = cs.fetchone()
+if row["LAST_VERSION"]:
+    last_version_num = int(row["LAST_VERSION"][1:])
+    version = f"v{last_version_num + 1}"
+else:
+    version = "v1"
 
-        for file in [
-            f"ml/model_{model_version}.pkl.gz",
-            f"ml/signature_{model_version}.json",
-            f"ml/drift_baseline_{model_version}.json",
-            f"ml/metrics_{model_version}.json"
-        ]:
-            cursor.execute(f"PUT file://{file} @ml_models_stage OVERWRITE=TRUE")
+# Demote existing champion
+cs.execute("UPDATE MODEL_HISTORY SET IS_CHAMPION = FALSE WHERE IS_CHAMPION = TRUE")
 
-        cursor.execute(f"""
-            INSERT INTO MODEL_HISTORY (VERSION, ACCURACY, IS_CHAMPION)
-            SELECT '{model_version}', {current_accuracy}, FALSE;
-        """)
-        cursor.execute("UPDATE MODEL_HISTORY SET IS_CHAMPION = FALSE;")
-        cursor.execute(f"UPDATE MODEL_HISTORY SET IS_CHAMPION = TRUE WHERE VERSION = '{model_version}';")
+# Insert new version as champion
+cs.execute(f"""
+    INSERT INTO MODEL_HISTORY (VERSION, ACCURACY, TIMESTAMP, IS_CHAMPION)
+    VALUES (%s, %s, CURRENT_TIMESTAMP, %s)
+""", (version, accuracy, True))
 
-        udf_sql = f"""
-CREATE OR REPLACE FUNCTION predict_customer_segment(
+print(f"✅ Logged model version: {version} | accuracy: {accuracy} | champion: TRUE")
+
+# -------------------------------
+# Recreate the inference UDF
+# -------------------------------
+print("🔁 Creating or replacing inference UDF...")
+
+udf_sql = f"""
+CREATE OR REPLACE FUNCTION infer_model(
     sales_price FLOAT,
-    quantity INT,
+    quantity FLOAT,
     discount_amt FLOAT,
     net_profit FLOAT,
     year INT,
-    month INT,
-    day INT,
+    month_seq INT,
     birth_year INT,
-    profit_ratio FLOAT,
-    is_weekend INT
+    day_name STRING
 )
 RETURNS FLOAT
 LANGUAGE PYTHON
 RUNTIME_VERSION = '3.10'
-HANDLER = 'predict'
 PACKAGES = ('scikit-learn', 'cloudpickle', 'numpy')
-IMPORTS = ('@ml_models_stage/model_{model_version}.pkl.gz')
+IMPORTS = ('@ml_models_stage/model.pkl.gz')
+HANDLER = 'predict'
 AS
 $$
-import cloudpickle, gzip, sys, os
-model_path = os.path.join(sys._xoptions["snowflake_import_directory"], "model_{model_version}.pkl.gz")
+import cloudpickle, gzip, os, sys
+
+model_path = os.path.join(sys._xoptions["snowflake_import_directory"], "model.pkl.gz")
 with gzip.open(model_path, "rb") as f:
     model = cloudpickle.load(f)
-def predict(sales_price, quantity, discount_amt, net_profit, year, month, day, birth_year, profit_ratio, is_weekend):
-    return float(model.predict([[sales_price, quantity, discount_amt, net_profit, year, month, day, birth_year, profit_ratio, is_weekend]])[0])
+
+def predict(sales_price, quantity, discount_amt, net_profit, year, month_seq, birth_year, day_name):
+    profit_ratio = net_profit / sales_price if sales_price != 0 else 0
+    age_group = "GenZ"
+    if birth_year <= 1980:
+        age_group = "GenX"
+    elif birth_year <= 2000:
+        age_group = "Millennial"
+    is_weekend = 1 if day_name in ["Saturday", "Sunday"] else 0
+
+    features = [
+        sales_price, quantity, discount_amt, net_profit,
+        year, month_seq, birth_year, profit_ratio, is_weekend
+    ]
+    return float(model.predict([features])[0])
 $$;
 """
-        cursor.execute(udf_sql)
-        print("✅ New champion promoted and UDF updated.")
-    else:
-        print("⚠️ Model did not outperform current champion.")
-finally:
-    cursor.close()
-    conn.close()
+
+cs.execute(udf_sql)
+print("✅ Inference UDF `infer_model` created successfully.")
+
+cs.close()
+conn.close()
