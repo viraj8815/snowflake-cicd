@@ -28,24 +28,13 @@ session = Session.builder.configs(connection_parameters).create()
 # -------------------------------
 # Load and Join 3 Tables
 # -------------------------------
-sales = session.table("ML_DB.TRAINING_DATA.CATALOG_SALES_SAMPLE")
-cust = session.table("ML_DB.TRAINING_DATA.CUSTOMER_SAMPLE")
-date = session.table("ML_DB.TRAINING_DATA.DATE_DIM_SAMPLE")
+sales = session.table("TPCDS_10TB.TPCDS_SF10TCL.CATALOG_SALES")
+cust = session.table("TPCDS_10TB.TPCDS_SF10TCL.CUSTOMER")
+date = session.table("TPCDS_10TB.TPCDS_SF10TCL.DATE_DIM")
 
 df = (
     sales.join(cust, sales["CS_BILL_CUSTOMER_SK"] == cust["C_CUSTOMER_SK"])
          .join(date, sales["CS_SOLD_DATE_SK"] == date["D_DATE_SK"])
-         .select(
-             sales["CS_SALES_PRICE"],
-             sales["CS_QUANTITY"],
-             sales["CS_EXT_DISCOUNT_AMT"],
-             sales["CS_NET_PROFIT"],
-             date["D_YEAR"],
-             date["D_MONTH_SEQ"],
-             date["D_DAY_NAME"],
-             cust["C_BIRTH_YEAR"],
-             cust["C_CURRENT_CDEMO_SK"]
-         )
          .with_column("profit_ratio",
                       when(sales["CS_SALES_PRICE"] != 0,
                            sales["CS_NET_PROFIT"] / sales["CS_SALES_PRICE"])
@@ -57,6 +46,20 @@ df = (
          .with_column("is_weekend",
                       when(date["D_DAY_NAME"].isin(["Saturday", "Sunday"]), 1)
                       .otherwise(0))
+         .select(
+             sales["CS_SALES_PRICE"],
+             sales["CS_QUANTITY"],
+             sales["CS_EXT_DISCOUNT_AMT"],
+             sales["CS_NET_PROFIT"],
+             date["D_YEAR"],
+             date["D_MONTH_SEQ"],
+             date["D_DAY_NAME"],
+             cust["C_BIRTH_YEAR"],
+             cust["C_CURRENT_CDEMO_SK"],
+             "profit_ratio",
+             "age_group",
+             "is_weekend"
+         )
 )
 
 # -------------------------------
@@ -72,14 +75,14 @@ if len(pdf) == 0:
 X = pdf.drop("label", axis=1)
 y = pdf["label"]
 
-# Convert categorical variables to numeric (one-hot encoding)
+# Convert categorical features
 X = pd.get_dummies(X, columns=["age_group", "D_DAY_NAME"])
-
-X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=42)
 
 # -------------------------------
 # Train model
 # -------------------------------
+X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=42)
+
 model = RandomForestClassifier(n_estimators=100, random_state=42)
 model.fit(X_train, y_train)
 y_pred = model.predict(X_test)
@@ -115,6 +118,4 @@ with open("ml/metrics.json", "w") as f:
 with open("ml/drift_baseline.json", "w") as f:
     json.dump(pdf.describe().to_dict(), f, indent=2)
 
-print("✅ Model trained, tracked with MLflow, and saved to ./ml")
-
-
+print("✅ Model trained, tracked, and artifacts saved.")
