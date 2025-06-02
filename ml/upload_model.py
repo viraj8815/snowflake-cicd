@@ -132,3 +132,4 @@ print("✅ UDF deployed using model_v1.pkl.gz")
 # -----------------------------
 cursor.close()
 conn.close()
+
