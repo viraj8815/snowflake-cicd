@@ -7,6 +7,7 @@ import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
+from mlflow.models.signature import infer_signature
 from snowflake.snowpark import Session
 from snowflake.snowpark.functions import when
 
@@ -28,22 +29,22 @@ session = Session.builder.configs(connection_parameters).create()
 # -------------------------------
 # Load and Join 3 Tables
 # -------------------------------
-sales = session.table("ML_DB.TRAINING_DATA.CATALOG_SALES_SAMPLE")
-cust = session.table("ML_DB.TRAINING_DATA.CUSTOMER_SAMPLE")
-date = session.table("ML_DB.TRAINING_DATA.DATE_DIM_SAMPLE")
+sales = session.table("STAGE_DB.TRAINING_DATA.CATALOG_SALES_SAMPLE")
+cust = session.table("STAGE_DB.TRAINING_DATA.CUSTOMER_SAMPLE")
+date = session.table("STAGE_DB.TRAINING_DATA.DATE_DIM_SAMPLE")
 
 df = (
     sales.join(cust, sales["CS_BILL_CUSTOMER_SK"] == cust["C_CUSTOMER_SK"])
          .join(date, sales["CS_SOLD_DATE_SK"] == date["D_DATE_SK"])
-         .with_column("PROFIT_RATIO",
+         .with_column("profit_ratio",
                       when(sales["CS_SALES_PRICE"] != 0,
                            sales["CS_NET_PROFIT"] / sales["CS_SALES_PRICE"])
                       .otherwise(0))
-         .with_column("AGE_GROUP",
+         .with_column("age_group",
                       when(cust["C_BIRTH_YEAR"] <= 1980, "GenX")
                       .when(cust["C_BIRTH_YEAR"] <= 2000, "Millennial")
                       .otherwise("GenZ"))
-         .with_column("IS_WEEKEND",
+         .with_column("is_weekend",
                       when(date["D_DAY_NAME"].isin(["Saturday", "Sunday"]), 1)
                       .otherwise(0))
          .select(
@@ -56,9 +57,9 @@ df = (
              date["D_DAY_NAME"],
              cust["C_BIRTH_YEAR"],
              cust["C_CURRENT_CDEMO_SK"],
-             "PROFIT_RATIO",
-             "AGE_GROUP",
-             "IS_WEEKEND"
+             "profit_ratio",
+             "age_group",
+             "is_weekend"
          )
          .limit(5000)
 )
@@ -70,8 +71,6 @@ pdf = df.to_pandas()
 pdf.rename(columns={"C_CURRENT_CDEMO_SK": "label"}, inplace=True)
 pdf.dropna(subset=["label"], inplace=True)
 
-print(f"✅ Rows available for training: {len(pdf)}")
-
 if len(pdf) == 0:
     raise ValueError("❌ No rows available for training.")
 
@@ -79,7 +78,7 @@ X = pdf.drop("label", axis=1)
 y = pdf["label"]
 
 # Convert categorical features
-X = pd.get_dummies(X, columns=["AGE_GROUP", "D_DAY_NAME"])
+X = pd.get_dummies(X, columns=["age_group", "D_DAY_NAME"])
 
 # -------------------------------
 # Train model
@@ -92,13 +91,21 @@ y_pred = model.predict(X_test)
 accuracy = accuracy_score(y_test, y_pred)
 
 # -------------------------------
-# MLflow Tracking
+# MLflow Tracking with signature
 # -------------------------------
+signature = infer_signature(X_train, y_pred)
+input_example = X_train.iloc[:1]
+
 mlflow.set_experiment("snowflake-ml-model")
 with mlflow.start_run():
     mlflow.log_param("model_type", "RandomForestClassifier")
     mlflow.log_metric("accuracy", accuracy)
-    mlflow.sklearn.log_model(model, artifact_path="model")
+    mlflow.sklearn.log_model(
+        model,
+        artifact_path="model",
+        input_example=input_example,
+        signature=signature
+    )
 
 # -------------------------------
 # Save Artifacts

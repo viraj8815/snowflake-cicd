@@ -17,64 +17,54 @@ conn = snowflake.connector.connect(
 cursor = conn.cursor()
 
 # -----------------------------
-# Load accuracy from metrics.json
+# Upload model + artifacts to stage
 # -----------------------------
-with open("ml/metrics.json") as f:
-    metrics = json.load(f)
-new_accuracy = float(metrics.get("accuracy", 0.0))
+print("📦 Uploading artifacts for version 1...")
+artifacts = {
+    "ml/model.pkl.gz": "model_v1.pkl.gz",
+    "ml/metrics.json": "metrics_v1.json",
+    "ml/signature.json": "signature_v1.json",
+    "ml/drift_baseline.json": "drift_baseline_v1.json"
+}
+
+for local_path, stage_file in artifacts.items():
+    cursor.execute(f"PUT file://{local_path} @ml_models_stage/{stage_file} AUTO_COMPRESS=FALSE OVERWRITE=TRUE")
+    print(f"✅ Uploaded {stage_file}")
 
 # -----------------------------
-# Create MODEL_HISTORY table if not exists
+# Load accuracy from metrics
+# -----------------------------
+with open("ml/metrics.json") as f:
+    accuracy = float(json.load(f).get("accuracy", 0.0))
+
+# -----------------------------
+# Create model history table
 # -----------------------------
 cursor.execute("""
     CREATE TABLE IF NOT EXISTS STAGE_DB.PUBLIC.MODEL_HISTORY (
         version STRING,
         accuracy FLOAT,
         deployed_on TIMESTAMP,
-        is_champion BOOLEAN,
-        model_path STRING
+        is_champion BOOLEAN
     )
 """)
 
 # -----------------------------
-# Set version = '1' manually for first run
+# Insert version 1 as champion
 # -----------------------------
-version = "1"
-
-# -----------------------------
-# Upload artifacts with versioned names
-# -----------------------------
-print(f"📦 Uploading artifacts for version {version}...")
-
-artifacts = {
-    f"ml/model.pkl.gz": f"model_v{version}.pkl.gz",
-    f"ml/metrics.json": f"metrics_v{version}.json",
-    f"ml/signature.json": f"signature_v{version}.json",
-    f"ml/drift_baseline.json": f"drift_baseline_v{version}.json"
-}
-
-for src, dest in artifacts.items():
-    cursor.execute(f"PUT file://{src} @ml_models_stage/{dest} AUTO_COMPRESS=FALSE OVERWRITE=TRUE")
-    print(f"✅ Uploaded {dest}")
-
-# -----------------------------
-# Log v1 to MODEL_HISTORY
-# -----------------------------
-cursor.execute("UPDATE STAGE_DB.PUBLIC.MODEL_HISTORY SET is_champion = FALSE")
-
-cursor.execute(f"""
+cursor.execute("""
     INSERT INTO STAGE_DB.PUBLIC.MODEL_HISTORY 
-    (version, accuracy, deployed_on, is_champion, model_path)
-    VALUES ('{version}', {new_accuracy}, CURRENT_TIMESTAMP(), TRUE, 'model_v{version}.pkl.gz')
-""")
-print(f"✅ Logged model version {version} with accuracy {new_accuracy:.4f} as champion.")
+    (version, accuracy, deployed_on, is_champion)
+    VALUES ('1', %s, CURRENT_TIMESTAMP(), TRUE)
+""", (accuracy,))
+print(f"✅ Logged model version 1 with accuracy {accuracy:.4f} as champion.")
 
 # -----------------------------
-# Deploy UDF pointing to v1 model
+# Create Python UDF using model_v1.pkl.gz
 # -----------------------------
 print("🔧 Creating or replacing Python UDF...")
 
-cursor.execute(f"""
+cursor.execute("""
 CREATE OR REPLACE FUNCTION infer_model(
     CS_SALES_PRICE FLOAT,
     CS_QUANTITY FLOAT,
@@ -125,11 +115,10 @@ def predict(CS_SALES_PRICE, CS_QUANTITY, CS_EXT_DISCOUNT_AMT, CS_NET_PROFIT,
 $$;
 """)
 
-print("✅ UDF deployed using model_v1.pkl.gz")
+print("✅ Python UDF deployed successfully.")
 
 # -----------------------------
-# Done
+# Cleanup
 # -----------------------------
 cursor.close()
 conn.close()
-
