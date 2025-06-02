@@ -19,7 +19,7 @@ connection_parameters = {
     "password": os.environ["SNOWFLAKE_PASSWORD"],
     "role": os.environ["SNOWFLAKE_ROLE"],
     "warehouse": os.environ["SNOWFLAKE_WAREHOUSE"],
-    "database": os.environ["SNOWFLAKE_DATABASE"],
+    "database": os.environ["SNOWFLAKE_DATABASE"],  # uses env like SNOWFLAKE_DATABASE_PROD/STAGE
     "schema": os.environ["SNOWFLAKE_SCHEMA"]
 }
 
@@ -60,34 +60,30 @@ df = (
              "age_group",
              "is_weekend"
          )
+         .limit(5000)  # Limit to avoid long runtime and memory overload
 )
 
 # -------------------------------
 # Convert to Pandas
 # -------------------------------
 pdf = df.to_pandas()
-pdf.columns = [col.lower() for col in pdf.columns]
-pdf.rename(columns={"c_current_cdemo_sk": "label"}, inplace=True)
-
-print("🔍 Preview of joined Snowpark DataFrame:")
-print(pdf.head())
-print("✅ Rows available for training:", len(pdf))
-
+pdf.rename(columns={"C_CURRENT_CDEMO_SK": "label"}, inplace=True)
 pdf.dropna(subset=["label"], inplace=True)
+
 if len(pdf) == 0:
     raise ValueError("❌ No rows available for training.")
 
 X = pdf.drop("label", axis=1)
 y = pdf["label"]
 
-# Verify and encode categorical features
-print("📊 Columns before encoding:", X.columns.tolist())
-X = pd.get_dummies(X, columns=["age_group", "d_day_name"])
+# Convert categorical features
+X = pd.get_dummies(X, columns=["age_group", "D_DAY_NAME"])
 
 # -------------------------------
 # Train model
 # -------------------------------
 X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=42)
+
 model = RandomForestClassifier(n_estimators=100, random_state=42)
 model.fit(X_train, y_train)
 y_pred = model.predict(X_test)
@@ -123,4 +119,4 @@ with open("ml/metrics.json", "w") as f:
 with open("ml/drift_baseline.json", "w") as f:
     json.dump(pdf.describe().to_dict(), f, indent=2)
 
-print("✅ Model trained, tracked with MLflow, and artifacts saved.")
+print("✅ Model trained, tracked, and artifacts saved.")

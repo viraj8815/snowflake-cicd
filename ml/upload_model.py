@@ -21,7 +21,11 @@ cursor = conn.cursor()
 # Upload model to stage
 # -----------------------------
 print("📦 Uploading model to stage...")
-cursor.execute("PUT file://ml/model.pkl.gz @ml_models_stage auto_compress=false overwrite=true")
+cursor.execute("""
+    PUT file://ml/model.pkl.gz @ml_models_stage 
+    AUTO_COMPRESS=FALSE 
+    OVERWRITE=TRUE
+""")
 print("✅ Model uploaded to Snowflake stage.")
 
 # -----------------------------
@@ -31,25 +35,25 @@ print("🔧 Creating or replacing Python UDF...")
 
 cursor.execute("""
 CREATE OR REPLACE FUNCTION infer_model(
-    sales_price FLOAT,
-    quantity FLOAT,
-    discount_amt FLOAT,
-    net_profit FLOAT,
-    d_year INT,
-    d_month_seq INT,
-    c_birth_year INT,
-    profit_ratio FLOAT,
-    is_weekend INT,
-    age_group_genx INT,
-    age_group_millennial INT,
-    age_group_genz INT,
-    d_day_name_friday INT,
-    d_day_name_monday INT,
-    d_day_name_saturday INT,
-    d_day_name_sunday INT,
-    d_day_name_thursday INT,
-    d_day_name_tuesday INT,
-    d_day_name_wednesday INT
+    CS_SALES_PRICE FLOAT,
+    CS_QUANTITY FLOAT,
+    CS_EXT_DISCOUNT_AMT FLOAT,
+    CS_NET_PROFIT FLOAT,
+    D_YEAR INT,
+    D_MONTH_SEQ INT,
+    C_BIRTH_YEAR INT,
+    PROFIT_RATIO FLOAT,
+    IS_WEEKEND INT,
+    AGE_GROUP_GENX INT,
+    AGE_GROUP_MILLENNIAL INT,
+    AGE_GROUP_GENZ INT,
+    D_DAY_NAME_FRIDAY INT,
+    D_DAY_NAME_MONDAY INT,
+    D_DAY_NAME_SATURDAY INT,
+    D_DAY_NAME_SUNDAY INT,
+    D_DAY_NAME_THURSDAY INT,
+    D_DAY_NAME_TUESDAY INT,
+    D_DAY_NAME_WEDNESDAY INT
 )
 RETURNS FLOAT
 LANGUAGE PYTHON
@@ -64,17 +68,17 @@ model_path = os.path.join(sys._xoptions["snowflake_import_directory"], "model.pk
 with gzip.open(model_path, "rb") as f:
     model = cloudpickle.load(f)
 
-def predict(sales_price, quantity, discount_amt, net_profit, d_year, d_month_seq, c_birth_year,
-            profit_ratio, is_weekend,
-            age_group_genx, age_group_millennial, age_group_genz,
-            d_day_name_friday, d_day_name_monday, d_day_name_saturday, d_day_name_sunday,
-            d_day_name_thursday, d_day_name_tuesday, d_day_name_wednesday):
+def predict(CS_SALES_PRICE, CS_QUANTITY, CS_EXT_DISCOUNT_AMT, CS_NET_PROFIT,
+            D_YEAR, D_MONTH_SEQ, C_BIRTH_YEAR, PROFIT_RATIO, IS_WEEKEND,
+            AGE_GROUP_GENX, AGE_GROUP_MILLENNIAL, AGE_GROUP_GENZ,
+            D_DAY_NAME_FRIDAY, D_DAY_NAME_MONDAY, D_DAY_NAME_SATURDAY, D_DAY_NAME_SUNDAY,
+            D_DAY_NAME_THURSDAY, D_DAY_NAME_TUESDAY, D_DAY_NAME_WEDNESDAY):
     features = [[
-        sales_price, quantity, discount_amt, net_profit,
-        d_year, d_month_seq, c_birth_year, profit_ratio, is_weekend,
-        age_group_genx, age_group_millennial, age_group_genz,
-        d_day_name_friday, d_day_name_monday, d_day_name_saturday, d_day_name_sunday,
-        d_day_name_thursday, d_day_name_tuesday, d_day_name_wednesday
+        CS_SALES_PRICE, CS_QUANTITY, CS_EXT_DISCOUNT_AMT, CS_NET_PROFIT,
+        D_YEAR, D_MONTH_SEQ, C_BIRTH_YEAR, PROFIT_RATIO, IS_WEEKEND,
+        AGE_GROUP_GENX, AGE_GROUP_MILLENNIAL, AGE_GROUP_GENZ,
+        D_DAY_NAME_FRIDAY, D_DAY_NAME_MONDAY, D_DAY_NAME_SATURDAY, D_DAY_NAME_SUNDAY,
+        D_DAY_NAME_THURSDAY, D_DAY_NAME_TUESDAY, D_DAY_NAME_WEDNESDAY
     ]]
     return float(model.predict(features)[0])
 $$;
