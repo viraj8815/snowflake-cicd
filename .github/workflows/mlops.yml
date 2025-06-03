@@ -32,7 +32,7 @@ jobs:
 
       - name: Upload MLflow logs
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@a2bfb3c4e9de44645f7b0e912d2a279fef88c518
         with:
           name: mlflow-logs
           path: mlruns/
