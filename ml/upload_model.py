@@ -113,12 +113,19 @@ CREATE OR REPLACE FUNCTION infer_model(
     CD_MARITAL_STATUS_D INT,
     CD_MARITAL_STATUS_M INT,
     CD_MARITAL_STATUS_S INT,
+    CD_MARITAL_STATUS_U INT,
+    CD_MARITAL_STATUS_W INT,
+    CD_EDUCATION_STATUS_2_yr_Degree INT,
+    CD_EDUCATION_STATUS_4_yr_Degree INT,
+    CD_EDUCATION_STATUS_Advanced_Degree INT,
     CD_EDUCATION_STATUS_College INT,
+    CD_EDUCATION_STATUS_Primary INT,
     CD_EDUCATION_STATUS_Secondary INT,
     CD_EDUCATION_STATUS_Unknown INT,
-    CD_CREDIT_RATING_High INT,
-    CD_CREDIT_RATING_Low INT,
-    CD_CREDIT_RATING_Medium INT
+    CD_CREDIT_RATING_Good INT,
+    CD_CREDIT_RATING_High_Risk INT,
+    CD_CREDIT_RATING_Low_Risk INT,
+    CD_CREDIT_RATING_Unknown INT
 )
 RETURNS STRING
 LANGUAGE PYTHON
@@ -134,21 +141,10 @@ model_path = os.path.join(sys._xoptions["snowflake_import_directory"], "model.pk
 with gzip.open(model_path, "rb") as f:
     model = cloudpickle.load(f)
 
-def predict(CD_DEP_COUNT, CD_DEP_EMPLOYED_COUNT, CD_DEP_COLLEGE_COUNT, AGE, IS_WEEKEND,
-            CD_GENDER_F, CD_GENDER_M,
-            CD_MARITAL_STATUS_D, CD_MARITAL_STATUS_M, CD_MARITAL_STATUS_S,
-            CD_EDUCATION_STATUS_College, CD_EDUCATION_STATUS_Secondary, CD_EDUCATION_STATUS_Unknown,
-            CD_CREDIT_RATING_High, CD_CREDIT_RATING_Low, CD_CREDIT_RATING_Medium):
-
-    features = [[
-        CD_DEP_COUNT, CD_DEP_EMPLOYED_COUNT, CD_DEP_COLLEGE_COUNT, AGE, IS_WEEKEND,
-        CD_GENDER_F, CD_GENDER_M,
-        CD_MARITAL_STATUS_D, CD_MARITAL_STATUS_M, CD_MARITAL_STATUS_S,
-        CD_EDUCATION_STATUS_College, CD_EDUCATION_STATUS_Secondary, CD_EDUCATION_STATUS_Unknown,
-        CD_CREDIT_RATING_High, CD_CREDIT_RATING_Low, CD_CREDIT_RATING_Medium
-    ]]
-    return model.predict(features)[0]
+def predict(*args):
+    return model.predict([list(args)])[0]
 $$;
+
 
     """)
     print("✅ UDF deployed with champion model.")
