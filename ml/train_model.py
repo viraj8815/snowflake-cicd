@@ -64,6 +64,13 @@ pdf.dropna(inplace=True)
 if len(pdf) == 0:
     raise ValueError("No rows available for training.")
 
+pdf["purchase_range"] = pd.cut(
+    pdf["CD_PURCHASE_ESTIMATE"],
+    bins=[0, 500, 1000, float("inf")],
+    labels=["Low", "Medium", "High"]
+)
+
+
 X = pdf.drop("purchase_range", axis=1)
 y = pdf["purchase_range"]
 
