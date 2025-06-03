@@ -31,11 +31,11 @@ jobs:
         run: python ml/upload_model.py
 
       - name: Upload MLflow experiment logs
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@a2bfb3c4e9de44645f7b0e912d2a279fef88c518
         with:
             name: mlflow-logs
             path: mlruns/    
-                
+
     env:
       SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
       SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
