@@ -102,37 +102,54 @@ if accuracy >= best_accuracy:
     print("🔧 Creating or replacing Python UDF...")
 
     cursor.execute("""
-    CREATE OR REPLACE FUNCTION infer_model(
-        CD_DEP_COUNT INT,
-        CD_DEP_EMPLOYED_COUNT INT,
-        CD_DEP_COLLEGE_COUNT INT,
-        age FLOAT,
-        is_weekend INT,
-        CD_EDUCATION_STATUS_college INT,
-        CD_EDUCATION_STATUS_primary INT,
-        CD_EDUCATION_STATUS_secondary INT,
-        CD_EDUCATION_STATUS_unknown INT,
-        CD_CREDIT_RATING_high INT,
-        CD_CREDIT_RATING_low INT,
-        CD_CREDIT_RATING_medium INT
-    )
-    RETURNS STRING
-    LANGUAGE PYTHON
-    RUNTIME_VERSION = '3.10'
-    HANDLER = 'predict'
-    PACKAGES = ('scikit-learn', 'cloudpickle', 'numpy', 'pandas')
-    IMPORTS = ('@ml_models_stage/model.pkl.gz')
-    AS
-    $$
-    import cloudpickle, gzip, os, sys
-    model_path = os.path.join(sys._xoptions["snowflake_import_directory"], "model.pkl.gz")
-    with gzip.open(model_path, "rb") as f:
-        model = cloudpickle.load(f)
+CREATE OR REPLACE FUNCTION infer_model(
+    CD_DEP_COUNT INT,
+    CD_DEP_EMPLOYED_COUNT INT,
+    CD_DEP_COLLEGE_COUNT INT,
+    AGE INT,
+    IS_WEEKEND INT,
+    CD_GENDER_F INT,
+    CD_GENDER_M INT,
+    CD_MARITAL_STATUS_D INT,
+    CD_MARITAL_STATUS_M INT,
+    CD_MARITAL_STATUS_S INT,
+    CD_EDUCATION_STATUS_College INT,
+    CD_EDUCATION_STATUS_Secondary INT,
+    CD_EDUCATION_STATUS_Unknown INT,
+    CD_CREDIT_RATING_High INT,
+    CD_CREDIT_RATING_Low INT,
+    CD_CREDIT_RATING_Medium INT
+)
+RETURNS STRING
+LANGUAGE PYTHON
+RUNTIME_VERSION = '3.10'
+HANDLER = 'predict'
+PACKAGES = ('scikit-learn', 'cloudpickle', 'numpy')
+IMPORTS = ('@ml_models_stage/model.pkl.gz')
+AS
+$$
+import cloudpickle, gzip, os, sys
 
-    def predict(*args):
-        features = [list(args)]
-        return str(model.predict(features)[0])
-    $$;
+model_path = os.path.join(sys._xoptions["snowflake_import_directory"], "model.pkl.gz")
+with gzip.open(model_path, "rb") as f:
+    model = cloudpickle.load(f)
+
+def predict(CD_DEP_COUNT, CD_DEP_EMPLOYED_COUNT, CD_DEP_COLLEGE_COUNT, AGE, IS_WEEKEND,
+            CD_GENDER_F, CD_GENDER_M,
+            CD_MARITAL_STATUS_D, CD_MARITAL_STATUS_M, CD_MARITAL_STATUS_S,
+            CD_EDUCATION_STATUS_College, CD_EDUCATION_STATUS_Secondary, CD_EDUCATION_STATUS_Unknown,
+            CD_CREDIT_RATING_High, CD_CREDIT_RATING_Low, CD_CREDIT_RATING_Medium):
+
+    features = [[
+        CD_DEP_COUNT, CD_DEP_EMPLOYED_COUNT, CD_DEP_COLLEGE_COUNT, AGE, IS_WEEKEND,
+        CD_GENDER_F, CD_GENDER_M,
+        CD_MARITAL_STATUS_D, CD_MARITAL_STATUS_M, CD_MARITAL_STATUS_S,
+        CD_EDUCATION_STATUS_College, CD_EDUCATION_STATUS_Secondary, CD_EDUCATION_STATUS_Unknown,
+        CD_CREDIT_RATING_High, CD_CREDIT_RATING_Low, CD_CREDIT_RATING_Medium
+    ]]
+    return model.predict(features)[0]
+$$;
+
     """)
     print("✅ UDF deployed with champion model.")
 else:
