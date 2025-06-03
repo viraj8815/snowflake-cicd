@@ -111,3 +111,5 @@ with open("ml/drift_baseline.json", "w") as f:
     json.dump(pdf.describe(include='all').to_dict(), f, indent=2)
 
 print(f"✅ Model trained with {len(X.columns)} features. Accuracy = {accuracy:.4f}")
+
+
