@@ -34,9 +34,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v3
         with:
-            name: mlflow-logs
-            path: mlruns/
-
+          name: mlflow-logs
+          path: mlruns/
 
     env:
       SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
