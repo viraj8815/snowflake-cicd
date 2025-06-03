@@ -27,7 +27,7 @@ with open("ml/metrics.json") as f:
 accuracy = float(metrics.get("accuracy", 0.0))
 
 # -----------------------------
-# Create MODEL_HISTORY if not exists
+# Ensure MODEL_HISTORY table exists
 # -----------------------------
 cursor.execute("""
     CREATE TABLE IF NOT EXISTS STAGE_DB.PUBLIC.MODEL_HISTORY (
@@ -39,68 +39,62 @@ cursor.execute("""
 """)
 
 # -----------------------------
-# Determine next version
+# Get current best accuracy
 # -----------------------------
 cursor.execute("SELECT MAX(TRY_CAST(version AS INT)) FROM STAGE_DB.PUBLIC.MODEL_HISTORY")
 row = cursor.fetchone()
 last_version = int(row[0]) if row[0] is not None else 0
 version = str(last_version + 1)
 
-# -----------------------------
-# Rename artifacts to versioned names
-# -----------------------------
-versioned_model = f"ml/model_v{version}.pkl.gz"
-versioned_metrics = f"ml/metrics_v{version}.json"
-versioned_signature = f"ml/signature_v{version}.json"
-versioned_drift = f"ml/drift_baseline_v{version}.json"
-
-shutil.copyfile("ml/model.pkl.gz", versioned_model)
-shutil.copyfile("ml/metrics.json", versioned_metrics)
-shutil.copyfile("ml/signature.json", versioned_signature)
-shutil.copyfile("ml/drift_baseline.json", versioned_drift)
-
-print(f"✅ Created versioned artifacts for version {version}")
-
-# -----------------------------
-# Upload all artifacts
-# -----------------------------
-print(f"📦 Uploading artifacts for version {version}...")
-for file in [versioned_model, versioned_metrics, versioned_signature, versioned_drift]:
-    cursor.execute(f"PUT file://{file} @ml_models_stage AUTO_COMPRESS=FALSE OVERWRITE=TRUE")
-    print(f"✅ Uploaded {os.path.basename(file)}")
-
-# -----------------------------
-# Insert into MODEL_HISTORY
-# -----------------------------
-cursor.execute(f"""
-    INSERT INTO STAGE_DB.PUBLIC.MODEL_HISTORY 
-    (version, accuracy, deployed_on, is_champion)
-    VALUES ('{version}', {accuracy}, CURRENT_TIMESTAMP(), FALSE)
-""")
-
-# -----------------------------
-# Champion logic
-# -----------------------------
 cursor.execute("SELECT MAX(accuracy) FROM STAGE_DB.PUBLIC.MODEL_HISTORY")
-best_accuracy = cursor.fetchone()[0]
+best_accuracy = cursor.fetchone()[0] or 0.0
 
-if accuracy >= best_accuracy:
-    print("🏆 This is the best model so far. Updating model.pkl.gz for UDF...")
+# -----------------------------
+# Compare and conditionally deploy
+# -----------------------------
+if accuracy > best_accuracy:
+    print(f"🏆 New best model found (accuracy: {accuracy:.4f} > {best_accuracy:.4f}). Proceeding...")
+
+    # -----------------------------
+    # Rename artifacts to versioned names
+    # -----------------------------
+    versioned_model = f"ml/model_v{version}.pkl.gz"
+    versioned_metrics = f"ml/metrics_v{version}.json"
+    versioned_signature = f"ml/signature_v{version}.json"
+    versioned_drift = f"ml/drift_baseline_v{version}.json"
+
+    shutil.copyfile("ml/model.pkl.gz", versioned_model)
+    shutil.copyfile("ml/metrics.json", versioned_metrics)
+    shutil.copyfile("ml/signature.json", versioned_signature)
+    shutil.copyfile("ml/drift_baseline.json", versioned_drift)
+
+    print(f"✅ Created versioned artifacts for version {version}")
+
+    # -----------------------------
+    # Upload artifacts to Snowflake stage
+    # -----------------------------
+    print(f"📦 Uploading artifacts for version {version}...")
+    for file in [versioned_model, versioned_metrics, versioned_signature, versioned_drift]:
+        cursor.execute(f"PUT file://{file} @ml_models_stage AUTO_COMPRESS=FALSE OVERWRITE=TRUE")
+        print(f"✅ Uploaded {os.path.basename(file)}")
+
+    # -----------------------------
+    # Insert into MODEL_HISTORY and update champion
+    # -----------------------------
     cursor.execute("UPDATE STAGE_DB.PUBLIC.MODEL_HISTORY SET is_champion = FALSE")
     cursor.execute(f"""
-        UPDATE STAGE_DB.PUBLIC.MODEL_HISTORY 
-        SET is_champion = TRUE 
-        WHERE version = '{version}'
+        INSERT INTO STAGE_DB.PUBLIC.MODEL_HISTORY 
+        (version, accuracy, deployed_on, is_champion)
+        VALUES ('{version}', {accuracy}, CURRENT_TIMESTAMP(), TRUE)
     """)
-    # Copy current versioned model to model.pkl.gz for UDF
+
+    # -----------------------------
+    # Deploy champion model for UDF
+    # -----------------------------
     shutil.copyfile(versioned_model, "ml/model.pkl.gz")
     cursor.execute("PUT file://ml/model.pkl.gz @ml_models_stage AUTO_COMPRESS=FALSE OVERWRITE=TRUE")
 
-    # -----------------------------
-    # Create or Replace UDF
-    # -----------------------------
     print("🔧 Creating or replacing Python UDF...")
-
     cursor.execute("""
 CREATE OR REPLACE FUNCTION infer_model(
     CD_DEP_COUNT INT,
@@ -144,12 +138,10 @@ with gzip.open(model_path, "rb") as f:
 def predict(*args):
     return model.predict([list(args)])[0]
 $$;
-
-
     """)
     print("✅ UDF deployed with champion model.")
 else:
-    print("ℹ️ Model not deployed as it doesn't beat the champion accuracy.")
+    print(f"⚠️ Skipping deployment: accuracy {accuracy:.4f} is not better than best {best_accuracy:.4f}")
 
 # -----------------------------
 # Cleanup
