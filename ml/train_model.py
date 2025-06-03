@@ -64,6 +64,8 @@ pdf.dropna(inplace=True)
 if len(pdf) == 0:
     raise ValueError("No rows available for training.")
 
+print("📋 Columns in DataFrame:", pdf.columns.tolist())
+
 pdf["purchase_range"] = pd.cut(
     pdf["CD_PURCHASE_ESTIMATE"],
     bins=[0, 500, 1000, float("inf")],
