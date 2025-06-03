@@ -105,7 +105,8 @@ with open("ml/drift_baseline.json", "w") as f:
 # -----------------------------
 # Log to MLflow
 # -----------------------------
-mlflow.set_tracking_uri("file:///C:/Users/HP/OneDrive/Documents/LOCAL/snowflake-cicd/mlruns")
+if os.environ.get("GITHUB_ACTIONS", "") != "true":
+    mlflow.set_tracking_uri("file:///C:/Users/HP/OneDrive/Documents/LOCAL/snowflake-cicd/mlruns")
 mlflow.set_experiment("snowflake-ml-model")
 with mlflow.start_run(run_name="rf_model_v1") as run:
     mlflow.log_params({
