@@ -1,0 +1,15 @@
+artifact_uri: file:///home/runner/work/snowflake-cicd/snowflake-cicd/mlruns/456301690504398494/aef813a7bda0472f8aa80d1518a081e8/artifacts
+end_time: 1748987328082
+entry_point_name: ''
+experiment_id: '456301690504398494'
+lifecycle_stage: active
+run_id: aef813a7bda0472f8aa80d1518a081e8
+run_name: rf_model_v1
+run_uuid: aef813a7bda0472f8aa80d1518a081e8
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1748987319416
+status: 3
+tags: []
+user_id: runner

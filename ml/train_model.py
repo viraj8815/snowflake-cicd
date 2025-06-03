@@ -71,7 +71,6 @@ print("📋 Columns in DataFrame:", pdf.columns.tolist())
 
 X = pdf.drop("PURCHASE_RANGE", axis=1)
 y = pdf["PURCHASE_RANGE"]
-
 X = pd.get_dummies(X)
 
 # -----------------------------
@@ -84,10 +83,9 @@ y_pred = model.predict(X_test)
 accuracy = accuracy_score(y_test, y_pred)
 
 # -----------------------------
-# Save output locally
+# Save artifacts locally
 # -----------------------------
 os.makedirs("ml", exist_ok=True)
-
 with gzip.open("ml/model.pkl.gz", "wb") as f:
     cloudpickle.dump(model, f)
 
@@ -105,10 +103,10 @@ with open("ml/drift_baseline.json", "w") as f:
     json.dump(pdf.describe(include='all').to_dict(), f, indent=2)
 
 # -----------------------------
-# MLflow logging
+# Log to MLflow
 # -----------------------------
 mlflow.set_experiment("snowflake-ml-model")
-with mlflow.start_run(run_name="rf_model_v1"):
+with mlflow.start_run(run_name="rf_model_v1") as run:
     mlflow.log_params({
         "model_type": "RandomForestClassifier",
         "n_estimators": 100,
@@ -118,26 +116,26 @@ with mlflow.start_run(run_name="rf_model_v1"):
     mlflow.log_metric("accuracy", accuracy)
     mlflow.set_tag("dataset_version", "v1.0")
 
-    # Confusion matrix
+    # Save and log confusion matrix
     ConfusionMatrixDisplay.from_estimator(model, X_test, y_test)
     plt.title("Confusion Matrix")
     plt.savefig("ml/confusion_matrix.png")
-    mlflow.log_artifact(os.path.join("ml", "confusion_matrix.png"))
+    mlflow.log_artifact("ml/confusion_matrix.png")
 
-    # SHAP summary
+    # Save and log SHAP summary
     explainer = shap.TreeExplainer(model)
     shap.summary_plot(explainer.shap_values(X_test), X_test, show=False)
     plt.savefig("ml/shap_summary.png")
-    mlflow.log_artifact(os.path.join("ml", "shap_summary.png"))
+    mlflow.log_artifact("ml/shap_summary.png")
 
-    # Log model with signature and input example
+    # Log model using sklearn flavor
     signature = infer_signature(X_train, model.predict(X_train))
-    mlflow.sklearn.log_model(model, "model", input_example=X.head(5), signature=signature)
+    mlflow.sklearn.log_model(model, artifact_path="model", input_example=X.head(5), signature=signature)
 
-    # Log other files as artifacts
-    mlflow.log_artifact(os.path.join("ml", "model.pkl.gz"))
-    mlflow.log_artifact(os.path.join("ml", "metrics.json"))
-    mlflow.log_artifact(os.path.join("ml", "signature.json"))
-    mlflow.log_artifact(os.path.join("ml", "drift_baseline.json"))
+    # Log other files
+    mlflow.log_artifact("ml/model.pkl.gz")
+    mlflow.log_artifact("ml/metrics.json")
+    mlflow.log_artifact("ml/signature.json")
+    mlflow.log_artifact("ml/drift_baseline.json")
 
 print(f"✅ Model trained with {len(X.columns)} features. Accuracy = {accuracy:.4f}")
