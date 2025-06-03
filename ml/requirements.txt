@@ -7,3 +7,5 @@ joblib
 mlflow
 snowflake-snowpark-python
 pyarrow<19.0.0
+shap
+matplotlib

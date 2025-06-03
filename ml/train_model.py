@@ -84,10 +84,32 @@ accuracy = accuracy_score(y_test, y_pred)
 # MLflow tracking
 # -----------------------------
 mlflow.set_experiment("snowflake-ml-model")
-with mlflow.start_run():
-    mlflow.log_param("model_type", "RandomForestClassifier")
+with mlflow.start_run(run_name="rf_model_v1"):
+    mlflow.log_params({
+        "model_type": "RandomForestClassifier",
+        "n_estimators": 100,
+        "max_depth": 10,
+        "random_state": 42
+    })
     mlflow.log_metric("accuracy", accuracy)
-    mlflow.sklearn.log_model(model, artifact_path="model", input_example=X.head(1), signature=None)
+    mlflow.set_tag("dataset_version", "v1.0")
+
+    # Confusion matrix
+    ConfusionMatrixDisplay.from_estimator(model, X_test, y_test)
+    plt.title("Confusion Matrix")
+    os.makedirs("ml", exist_ok=True)
+    plt.savefig("ml/confusion_matrix.png")
+    mlflow.log_artifact("ml/confusion_matrix.png")
+
+    # SHAP summary
+    explainer = shap.TreeExplainer(model)
+    shap.summary_plot(explainer.shap_values(X_test), X_test, show=False)
+    plt.savefig("ml/shap_summary.png")
+    mlflow.log_artifact("ml/shap_summary.png")
+
+    # Log model
+    signature = infer_signature(X_train, model.predict(X_train))
+    mlflow.sklearn.log_model(model, "model", input_example=X.head(5), signature=signature)
 
 # -----------------------------
 # Save artifacts
