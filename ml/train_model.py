@@ -71,14 +71,13 @@ print("📋 Columns in DataFrame:", pdf.columns.tolist())
 
 X = pdf.drop("PURCHASE_RANGE", axis=1)
 y = pdf["PURCHASE_RANGE"]
-
 X = pd.get_dummies(X)
 
 # -----------------------------
 # Train model
 # -----------------------------
 X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=42)
-model = RandomForestClassifier(n_estimators=100, random_state=42)
+model = RandomForestClassifier(n_estimators=100, max_depth=10, random_state=42)
 model.fit(X_train, y_train)
 y_pred = model.predict(X_test)
 accuracy = accuracy_score(y_test, y_pred)
@@ -97,44 +96,48 @@ with mlflow.start_run(run_name="rf_model_v1"):
     mlflow.log_metric("accuracy", accuracy)
     mlflow.set_tag("dataset_version", "v1.0")
 
+    os.makedirs("ml", exist_ok=True)
+
     # Confusion matrix
     ConfusionMatrixDisplay.from_estimator(model, X_test, y_test)
     plt.title("Confusion Matrix")
-    os.makedirs("ml", exist_ok=True)
     plt.savefig("ml/confusion_matrix.png")
     mlflow.log_artifact("ml/confusion_matrix.png")
+    plt.clf()
 
     # SHAP summary
     explainer = shap.TreeExplainer(model)
     shap.summary_plot(explainer.shap_values(X_test), X_test, show=False)
     plt.savefig("ml/shap_summary.png")
     mlflow.log_artifact("ml/shap_summary.png")
+    plt.clf()
 
-    # Log model
+    # Log model with signature + input example
     signature = infer_signature(X_train, model.predict(X_train))
-    mlflow.sklearn.log_model(model, "model", input_example=X.head(5), signature=signature)
+    mlflow.sklearn.log_model(model, artifact_path="model", input_example=X.head(5), signature=signature)
 
-# -----------------------------
-# Save artifacts
-# -----------------------------
-os.makedirs("ml", exist_ok=True)
+    # Save local artifacts
+    with gzip.open("ml/model.pkl.gz", "wb") as f:
+        cloudpickle.dump(model, f)
 
-with gzip.open("ml/model.pkl.gz", "wb") as f:
-    cloudpickle.dump(model, f)
+    with open("ml/metrics.json", "w") as f:
+        json.dump({"accuracy": accuracy}, f, indent=2)
 
-with open("ml/metrics.json", "w") as f:
-    json.dump({"accuracy": accuracy}, f, indent=2)
+    with open("ml/signature.json", "w") as f:
+        json.dump({
+            "inputs": list(X.columns),
+            "output": "purchase_range",
+            "model_type": "RandomForestClassifier"
+        }, f, indent=2)
 
-with open("ml/signature.json", "w") as f:
-    json.dump({
-        "inputs": list(X.columns),
-        "output": "purchase_range",
-        "model_type": "RandomForestClassifier"
-    }, f, indent=2)
+    with open("ml/drift_baseline.json", "w") as f:
+        json.dump(pdf.describe(include='all').to_dict(), f, indent=2)
 
-with open("ml/drift_baseline.json", "w") as f:
-    json.dump(pdf.describe(include='all').to_dict(), f, indent=2)
+    # Log them to MLflow
+    mlflow.log_artifact("ml/model.pkl.gz")
+    mlflow.log_artifact("ml/metrics.json")
+    mlflow.log_artifact("ml/signature.json")
+    mlflow.log_artifact("ml/drift_baseline.json")
 
 print(f"✅ Model trained with {len(X.columns)} features. Accuracy = {accuracy:.4f}")
-
-
+session.close()
