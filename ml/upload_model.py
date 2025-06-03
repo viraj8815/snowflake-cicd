@@ -1,41 +1,9 @@
 import os
 import json
 import snowflake.connector
+import cloudpickle
+import gzip
 import shutil
-
-# -----------------------------
-# Load accuracy
-# -----------------------------
-with open("ml/metrics.json") as f:
-    metrics = json.load(f)
-accuracy = float(metrics.get("accuracy", 0.0))
-
-# -----------------------------
-# Determine version number
-# -----------------------------
-history_file = "ml/model_history.json"
-if os.path.exists(history_file):
-    with open(history_file) as f:
-        history = json.load(f)
-else:
-    history = []
-
-last_version = int(history[-1]["version"]) if history else 0
-version = last_version + 1
-
-# -----------------------------
-# Rename artifacts with version
-# -----------------------------
-versioned_artifacts = {
-    f"ml/model_v{version}.pkl.gz": "ml/model.pkl.gz",
-    f"ml/metrics_v{version}.json": "ml/metrics.json",
-    f"ml/signature_v{version}.json": "ml/signature.json",
-    f"ml/drift_baseline_v{version}.json": "ml/drift_baseline.json"
-}
-
-for dest, src in versioned_artifacts.items():
-    shutil.copyfile(src, dest)
-    print(f"✅ Created {dest}")
 
 # -----------------------------
 # Snowflake connection
@@ -52,15 +20,14 @@ conn = snowflake.connector.connect(
 cursor = conn.cursor()
 
 # -----------------------------
-# Upload versioned artifacts to stage
+# Read accuracy from metrics.json
 # -----------------------------
-print(f"📦 Uploading artifacts for version {version}...")
-for filepath in versioned_artifacts.keys():
-    cursor.execute(f"PUT file://{filepath} @ml_models_stage AUTO_COMPRESS=FALSE OVERWRITE=TRUE")
-    print(f"✅ Uploaded {os.path.basename(filepath)}")
+with open("ml/metrics.json") as f:
+    metrics = json.load(f)
+accuracy = float(metrics.get("accuracy", 0.0))
 
 # -----------------------------
-# Update history table in Snowflake
+# Create MODEL_HISTORY if not exists
 # -----------------------------
 cursor.execute("""
     CREATE TABLE IF NOT EXISTS STAGE_DB.PUBLIC.MODEL_HISTORY (
@@ -71,100 +38,108 @@ cursor.execute("""
     )
 """)
 
+# -----------------------------
+# Determine next version
+# -----------------------------
 cursor.execute("SELECT MAX(TRY_CAST(version AS INT)) FROM STAGE_DB.PUBLIC.MODEL_HISTORY")
 row = cursor.fetchone()
-existing_max_version = int(row[0]) if row[0] is not None else 0
-new_version = existing_max_version + 1
+last_version = int(row[0]) if row[0] is not None else 0
+version = str(last_version + 1)
 
+# -----------------------------
+# Rename artifacts to versioned names
+# -----------------------------
+versioned_model = f"ml/model_v{version}.pkl.gz"
+versioned_metrics = f"ml/metrics_v{version}.json"
+versioned_signature = f"ml/signature_v{version}.json"
+versioned_drift = f"ml/drift_baseline_v{version}.json"
+
+shutil.copyfile("ml/model.pkl.gz", versioned_model)
+shutil.copyfile("ml/metrics.json", versioned_metrics)
+shutil.copyfile("ml/signature.json", versioned_signature)
+shutil.copyfile("ml/drift_baseline.json", versioned_drift)
+
+print(f"✅ Created versioned artifacts for version {version}")
+
+# -----------------------------
+# Upload all artifacts
+# -----------------------------
+print(f"📦 Uploading artifacts for version {version}...")
+for file in [versioned_model, versioned_metrics, versioned_signature, versioned_drift]:
+    cursor.execute(f"PUT file://{file} @ml_models_stage AUTO_COMPRESS=FALSE OVERWRITE=TRUE")
+    print(f"✅ Uploaded {os.path.basename(file)}")
+
+# -----------------------------
+# Insert into MODEL_HISTORY
+# -----------------------------
 cursor.execute(f"""
     INSERT INTO STAGE_DB.PUBLIC.MODEL_HISTORY 
     (version, accuracy, deployed_on, is_champion)
-    VALUES ('{new_version}', {accuracy}, CURRENT_TIMESTAMP(), FALSE)
+    VALUES ('{version}', {accuracy}, CURRENT_TIMESTAMP(), FALSE)
 """)
 
 # -----------------------------
-# Set champion model (max accuracy)
+# Champion logic
 # -----------------------------
-cursor.execute("UPDATE STAGE_DB.PUBLIC.MODEL_HISTORY SET is_champion = FALSE")
-cursor.execute("""
-    UPDATE STAGE_DB.PUBLIC.MODEL_HISTORY
-    SET is_champion = TRUE
-    WHERE accuracy = (
-        SELECT MAX(accuracy) FROM STAGE_DB.PUBLIC.MODEL_HISTORY
-    )
-""")
+cursor.execute("SELECT MAX(accuracy) FROM STAGE_DB.PUBLIC.MODEL_HISTORY")
+best_accuracy = cursor.fetchone()[0]
 
-# -----------------------------
-# If current version is the best, deploy UDF using static model.pkl.gz
-# -----------------------------
-cursor.execute("""
-    SELECT version FROM STAGE_DB.PUBLIC.MODEL_HISTORY 
-    WHERE is_champion = TRUE ORDER BY version DESC LIMIT 1
-""")
-champion_version = cursor.fetchone()[0]
-
-if str(champion_version) == str(new_version):
+if accuracy >= best_accuracy:
     print("🏆 This is the best model so far. Updating model.pkl.gz for UDF...")
-    shutil.copyfile(f"ml/model_v{version}.pkl.gz", "ml/model.pkl.gz")
+    cursor.execute("UPDATE STAGE_DB.PUBLIC.MODEL_HISTORY SET is_champion = FALSE")
+    cursor.execute(f"""
+        UPDATE STAGE_DB.PUBLIC.MODEL_HISTORY 
+        SET is_champion = TRUE 
+        WHERE version = '{version}'
+    """)
+    # Copy current versioned model to model.pkl.gz for UDF
+    shutil.copyfile(versioned_model, "ml/model.pkl.gz")
     cursor.execute("PUT file://ml/model.pkl.gz @ml_models_stage AUTO_COMPRESS=FALSE OVERWRITE=TRUE")
 
+    # -----------------------------
+    # Create or Replace UDF
+    # -----------------------------
     print("🔧 Creating or replacing Python UDF...")
+
     cursor.execute("""
     CREATE OR REPLACE FUNCTION infer_model(
-    CS_SALES_PRICE FLOAT,
-    CS_QUANTITY FLOAT,
-    CS_EXT_DISCOUNT_AMT FLOAT,
-    CS_NET_PROFIT FLOAT,
-    D_YEAR INT,
-    D_MONTH_SEQ INT,
-    C_BIRTH_YEAR INT,
-    PROFIT_RATIO FLOAT,
-    IS_WEEKEND INT,
-    AGE_GROUP_MILLENNIAL INT,
-    AGE_GROUP_GENZ INT,
-    D_DAY_NAME_SATURDAY INT,
-    D_DAY_NAME_SUNDAY INT
-)
-RETURNS FLOAT
-LANGUAGE PYTHON
-RUNTIME_VERSION = '3.10'
-HANDLER = 'predict'
-PACKAGES = ('scikit-learn', 'cloudpickle', 'numpy')
-IMPORTS = ('@ml_models_stage/model.pkl.gz')
-AS
-$$
-import cloudpickle, gzip, os, sys
-model_path = os.path.join(sys._xoptions["snowflake_import_directory"], "model.pkl.gz")
-with gzip.open(model_path, "rb") as f:
-    model = cloudpickle.load(f)
+        CD_DEP_COUNT INT,
+        CD_DEP_EMPLOYED_COUNT INT,
+        CD_DEP_COLLEGE_COUNT INT,
+        age FLOAT,
+        is_weekend INT,
+        CD_EDUCATION_STATUS_college INT,
+        CD_EDUCATION_STATUS_primary INT,
+        CD_EDUCATION_STATUS_secondary INT,
+        CD_EDUCATION_STATUS_unknown INT,
+        CD_CREDIT_RATING_high INT,
+        CD_CREDIT_RATING_low INT,
+        CD_CREDIT_RATING_medium INT
+    )
+    RETURNS STRING
+    LANGUAGE PYTHON
+    RUNTIME_VERSION = '3.10'
+    HANDLER = 'predict'
+    PACKAGES = ('scikit-learn', 'cloudpickle', 'numpy', 'pandas')
+    IMPORTS = ('@ml_models_stage/model.pkl.gz')
+    AS
+    $$
+    import cloudpickle, gzip, os, sys
+    model_path = os.path.join(sys._xoptions["snowflake_import_directory"], "model.pkl.gz")
+    with gzip.open(model_path, "rb") as f:
+        model = cloudpickle.load(f)
 
-def predict(CS_SALES_PRICE, CS_QUANTITY, CS_EXT_DISCOUNT_AMT, CS_NET_PROFIT,
-            D_YEAR, D_MONTH_SEQ, C_BIRTH_YEAR, PROFIT_RATIO, IS_WEEKEND,
-            AGE_GROUP_MILLENNIAL, AGE_GROUP_GENZ,
-            D_DAY_NAME_SATURDAY, D_DAY_NAME_SUNDAY):
-    features = [[
-        CS_SALES_PRICE, CS_QUANTITY, CS_EXT_DISCOUNT_AMT, CS_NET_PROFIT,
-        D_YEAR, D_MONTH_SEQ, C_BIRTH_YEAR, PROFIT_RATIO, IS_WEEKEND,
-        AGE_GROUP_MILLENNIAL, AGE_GROUP_GENZ,
-        D_DAY_NAME_SATURDAY, D_DAY_NAME_SUNDAY
-    ]]
-    return float(model.predict(features)[0])
-$$;
+    def predict(*args):
+        features = [list(args)]
+        return str(model.predict(features)[0])
+    $$;
     """)
-    print("✅ UDF updated to use best performing model.")
+    print("✅ UDF deployed with champion model.")
 else:
-    print(f"⚠️ Model v{version} not deployed as it's not the highest accuracy.")
-
-# -----------------------------
-# Update local history for reference
-# -----------------------------
-history.append({"version": version, "accuracy": accuracy})
-with open(history_file, "w") as f:
-    json.dump(history, f, indent=2)
+    print("ℹ️ Model not deployed as it doesn't beat the champion accuracy.")
 
 # -----------------------------
 # Cleanup
 # -----------------------------
 cursor.close()
 conn.close()
-
