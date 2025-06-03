@@ -30,6 +30,14 @@ jobs:
       - name: Upload model and deploy UDF
         run: python ml/upload_model.py
 
+      - name: Upload MLflow logs
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+            name: mlflow-logs
+            path: mlruns/
+
+
     env:
       SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
       SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
