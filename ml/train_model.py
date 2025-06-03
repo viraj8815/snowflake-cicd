@@ -66,15 +66,8 @@ if len(pdf) == 0:
 
 print("📋 Columns in DataFrame:", pdf.columns.tolist())
 
-pdf["purchase_range"] = pd.cut(
-    pdf["CD_PURCHASE_ESTIMATE"],
-    bins=[0, 500, 1000, float("inf")],
-    labels=["Low", "Medium", "High"]
-)
-
-
-X = pdf.drop("purchase_range", axis=1)
-y = pdf["purchase_range"]
+X = pdf.drop("PURCHASE_RANGE", axis=1)
+y = pdf["PURCHASE_RANGE"]
 
 X = pd.get_dummies(X)
 
