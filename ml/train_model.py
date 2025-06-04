@@ -137,7 +137,8 @@ with mlflow.start_run(run_name=run_name) as run:
 
     # Log model using sklearn flavor
     signature = infer_signature(X_train, model.predict(X_train))
-    mlflow.sklearn.log_model(model, artifact_path="model", input_example=X.head(5), signature=signature)
+    input_example = X.head(5).astype(int)
+    mlflow.sklearn.log_model(model, artifact_path="model", input_example=input_example, signature=signature)
 
     # Log other artifacts
     mlflow.log_artifact("ml/model.pkl.gz")
