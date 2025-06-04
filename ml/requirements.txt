@@ -1,7 +1,11 @@
 pandas
+numpy
 scikit-learn
 cloudpickle
 snowflake-connector-python
 joblib
-json
-datetime
+mlflow
+snowflake-snowpark-python
+pyarrow<19.0.0
+shap
+matplotlib
