@@ -41,8 +41,8 @@ df = (
         .with_column("age", 2025 - cust["C_BIRTH_YEAR"])
         .with_column("is_weekend", when(date["D_DAY_NAME"].isin(["Saturday", "Sunday"]), 1).otherwise(0))
         .with_column("purchase_range",
-                     when(demo["CD_PURCHASE_ESTIMATE"] < 500, "Low")
-                     .when(demo["CD_PURCHASE_ESTIMATE"] < 1000, "Medium")
+                     when(demo["CD_PURCHASE_ESTIMATE"] < 4000, "Low")
+                     .when(demo["CD_PURCHASE_ESTIMATE"] < 7000, "Medium")
                      .otherwise("High"))
         .select(
             "CD_GENDER",

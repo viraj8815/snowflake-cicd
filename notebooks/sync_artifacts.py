@@ -9,7 +9,7 @@ DEST_DIR = r"C:\Users\HP\OneDrive\Documents\LOCAL\snowflake-cicd\mlruns"
 
 # ✅ 1. Remove old MLflow logs (Optional but recommended)
 for sub in Path(DEST_DIR).iterdir():
-    if sub.is_dir():
+    if sub.is_dir() and sub.name not in {".trash", "models"}:
         print(f"🗑️ Removing: {sub}")
         shutil.rmtree(sub)
 
