@@ -12,6 +12,7 @@ from sklearn.metrics import accuracy_score, ConfusionMatrixDisplay
 from snowflake.snowpark import Session
 from snowflake.snowpark.functions import when
 from mlflow.models.signature import infer_signature
+from mlflow.tracking import MlflowClient
 
 # -----------------------------
 # Snowflake connection
@@ -77,7 +78,7 @@ X = pd.get_dummies(X)
 # Train model
 # -----------------------------
 X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=42)
-model = RandomForestClassifier(n_estimators=100, random_state=42)
+model = RandomForestClassifier(n_estimators=100, max_depth=10, random_state=42)
 model.fit(X_train, y_train)
 y_pred = model.predict(X_test)
 accuracy = accuracy_score(y_test, y_pred)
@@ -96,7 +97,8 @@ with open("ml/signature.json", "w") as f:
     json.dump({
         "inputs": list(X.columns),
         "output": "purchase_range",
-        "model_type": "RandomForestClassifier"
+        "model_type": model.__class__.__name__,
+        "hyperparams": model.get_params()
     }, f, indent=2)
 
 with open("ml/drift_baseline.json", "w") as f:
@@ -105,26 +107,29 @@ with open("ml/drift_baseline.json", "w") as f:
 # -----------------------------
 # Log to MLflow
 # -----------------------------
-if os.environ.get("GITHUB_ACTIONS", "") != "true":
-    mlflow.set_tracking_uri("file:///C:/Users/HP/OneDrive/Documents/LOCAL/snowflake-cicd/mlruns")
-mlflow.set_experiment("snowflake-ml-model")
-with mlflow.start_run(run_name="rf_model_v1") as run:
-    mlflow.log_params({
-        "model_type": "RandomForestClassifier",
-        "n_estimators": 100,
-        "max_depth": 10,
-        "random_state": 42
-    })
-    mlflow.log_metric("accuracy", accuracy)
-    mlflow.set_tag("dataset_version", "v1.0")
+experiment_name = "snowflake-ml-model"
+mlflow.set_experiment(experiment_name)
 
-    # Save and log confusion matrix
+client = MlflowClient()
+experiment = client.get_experiment_by_name(experiment_name)
+existing_runs = client.search_runs(experiment.experiment_id)
+version_number = len(existing_runs) + 1
+run_name = f"rf_model_v{version_number}"
+
+with mlflow.start_run(run_name=run_name) as run:
+    mlflow.set_tag("dataset_version", f"v{version_number}")
+    mlflow.set_tag("model_version", run_name)
+
+    mlflow.log_params(model.get_params())
+    mlflow.log_metric("accuracy", accuracy)
+
+    # Confusion matrix
     ConfusionMatrixDisplay.from_estimator(model, X_test, y_test)
     plt.title("Confusion Matrix")
     plt.savefig("ml/confusion_matrix.png")
     mlflow.log_artifact("ml/confusion_matrix.png")
 
-    # Save and log SHAP summary
+    # SHAP summary
     explainer = shap.TreeExplainer(model)
     shap.summary_plot(explainer.shap_values(X_test), X_test, show=False)
     plt.savefig("ml/shap_summary.png")
@@ -134,10 +139,10 @@ with mlflow.start_run(run_name="rf_model_v1") as run:
     signature = infer_signature(X_train, model.predict(X_train))
     mlflow.sklearn.log_model(model, artifact_path="model", input_example=X.head(5), signature=signature)
 
-    # Log other files
+    # Log other artifacts
     mlflow.log_artifact("ml/model.pkl.gz")
     mlflow.log_artifact("ml/metrics.json")
     mlflow.log_artifact("ml/signature.json")
     mlflow.log_artifact("ml/drift_baseline.json")
 
-print(f"✅ Model trained with {len(X.columns)} features. Accuracy = {accuracy:.4f}")
+print(f"✅ Trained and logged {run_name} with accuracy = {accuracy:.4f}")
