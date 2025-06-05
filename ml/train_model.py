@@ -23,8 +23,6 @@ connection_parameters = {
     "password": os.environ["SNOWFLAKE_PASSWORD"],
     "role": os.environ["SNOWFLAKE_ROLE"],
     "warehouse": os.environ["SNOWFLAKE_WAREHOUSE"],
-    "database": os.environ["SNOWFLAKE_DATABASE"],
-    "schema": os.environ["SNOWFLAKE_SCHEMA"]
 }
 session = Session.builder.configs(connection_parameters).create()
 
