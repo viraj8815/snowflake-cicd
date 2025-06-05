@@ -106,11 +106,11 @@ class_weights = {i: w for i, w in enumerate(class_weights_arr)}
 # Hyperparameter Search
 # -----------------------------
 param_grid = {
-    "depth": [6, 8, 10, 12],
-    "learning_rate": [0.01, 0.03, 0.05],
-    "iterations": [500, 1000, 1500, 2000],  # ✅ 2000 included
-    "l2_leaf_reg": [1, 3, 5, 7, 9],
-    "border_count": [32, 64, 128],
+    "depth": [12],
+    "learning_rate": [0.01],
+    "iterations": [500],
+    "l2_leaf_reg": [1],
+    "border_count": [64],
 }
 
 base_model = CatBoostClassifier(
