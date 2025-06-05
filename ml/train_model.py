@@ -55,8 +55,8 @@ pdf.dropna(inplace=True)
 if len(pdf) == 0:
     raise ValueError("No data for training.")
 
-X = pdf.drop("purchase_range", axis=1)
-y = pdf["purchase_range"]
+X = pdf.drop("PURCHASE_RANGE", axis=1)
+y = pdf["PURCHASE_RANGE"]
 
 # Ordinal encode categoricals
 cat_cols = X.select_dtypes(include=["object"]).columns
