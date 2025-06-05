@@ -69,9 +69,18 @@ pdf["TOTAL_DEP"] = pdf["CD_DEP_COUNT"] + pdf["CD_DEP_EMPLOYED_COUNT"] + pdf["CD_
 pdf["AGE_BIN"] = pd.cut(pdf["AGE"], bins=[0, 18, 30, 45, 60, 100], labels=["0", "1", "2", "3", "4"]).astype(str)
 
 # -----------------------------
-# Convert target to classes
+# Binary Classification: Low vs High
 # -----------------------------
-pdf["PURCHASE_RANGE"] = pd.qcut(pdf["CD_PURCHASE_ESTIMATE"], q=3, labels=["Low", "Medium", "High"])
+q1 = pdf["CD_PURCHASE_ESTIMATE"].quantile(1/3)
+q3 = pdf["CD_PURCHASE_ESTIMATE"].quantile(2/3)
+
+pdf = pdf[(pdf["CD_PURCHASE_ESTIMATE"] <= q1) | (pdf["CD_PURCHASE_ESTIMATE"] >= q3)].copy()
+pdf["PURCHASE_RANGE"] = pd.cut(
+    pdf["CD_PURCHASE_ESTIMATE"],
+    bins=[-float("inf"), q1, float("inf")],
+    labels=["Low", "High"]
+)
+
 X = pdf.drop(columns=["CD_PURCHASE_ESTIMATE", "PURCHASE_RANGE"])
 y = pdf["PURCHASE_RANGE"]
 
@@ -82,7 +91,7 @@ label_encoder = LabelEncoder()
 y_encoded = label_encoder.fit_transform(y)
 
 # -----------------------------
-# Split data
+# Train-Test Split
 # -----------------------------
 X_train, X_test, y_train, y_test = train_test_split(X, y_encoded, stratify=y_encoded, random_state=42)
 cat_cols = X.select_dtypes(include=["object", "category"]).columns.tolist()
@@ -94,18 +103,18 @@ class_weights_arr = compute_class_weight("balanced", classes=np.unique(y_train),
 class_weights = {i: w for i, w in enumerate(class_weights_arr)}
 
 # -----------------------------
-# Define hyperparameter search
+# Hyperparameter Search
 # -----------------------------
 param_grid = {
     "depth": [6, 8, 10, 12],
     "learning_rate": [0.01, 0.03, 0.05],
-    "iterations": [500, 1000, 1500, 2000],
+    "iterations": [500, 1000, 1500, 2000],  # ✅ 2000 included
     "l2_leaf_reg": [1, 3, 5, 7, 9],
     "border_count": [32, 64, 128],
 }
 
 base_model = CatBoostClassifier(
-    loss_function="MultiClass",
+    loss_function="Logloss",
     cat_features=cat_cols,
     early_stopping_rounds=10,
     class_weights=class_weights,
@@ -116,7 +125,7 @@ base_model = CatBoostClassifier(
 search = RandomizedSearchCV(
     estimator=base_model,
     param_distributions=param_grid,
-    n_iter=30,  # increase for deeper search
+    n_iter=30,
     scoring="accuracy",
     cv=3,
     verbose=2,
@@ -128,7 +137,7 @@ model = search.best_estimator_
 print("✅ Best Params:", search.best_params_)
 
 # -----------------------------
-# Evaluate model
+# Evaluate
 # -----------------------------
 y_pred = model.predict(X_test)
 accuracy = accuracy_score(y_test, y_pred)
@@ -136,7 +145,7 @@ f1 = f1_score(y_test, y_pred, average="macro")
 print(f"✅ Accuracy: {accuracy:.4f}, F1: {f1:.4f}")
 
 # -----------------------------
-# Save artifacts
+# Save Artifacts
 # -----------------------------
 os.makedirs("ml", exist_ok=True)
 pipeline = {
@@ -165,13 +174,13 @@ with open("ml/drift_baseline.json", "w") as f:
 # -----------------------------
 # Log to MLflow
 # -----------------------------
-experiment_name = "snowflake-ml-model-classifier-optimized"
+experiment_name = "snowflake-ml-binary-low-high"
 mlflow.set_experiment(experiment_name)
 client = MlflowClient()
 experiment = client.get_experiment_by_name(experiment_name)
 existing_runs = client.search_runs(experiment.experiment_id)
 version_number = len(existing_runs) + 1
-run_name = f"catboost_classifier_opt_v{version_number}"
+run_name = f"catboost_binary_lowhigh_v{version_number}"
 
 with mlflow.start_run(run_name=run_name) as run:
     mlflow.set_tag("model_version", run_name)
@@ -193,4 +202,4 @@ with mlflow.start_run(run_name=run_name) as run:
     mlflow.log_artifact("ml/signature.json")
     mlflow.log_artifact("ml/drift_baseline.json")
 
-print(f"✅ Final Accuracy: {accuracy:.4f}, F1 Score: {f1:.4f}, Version: {version_number}")
+print(f"✅ Final Binary Accuracy: {accuracy:.4f}, F1 Score: {f1:.4f}, Version: {version_number}")
