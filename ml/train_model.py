@@ -69,8 +69,8 @@ if len(pdf) == 0:
 
 print("📋 Columns in DataFrame:", pdf.columns.tolist())
 
-X = pdf.drop("purchase_range", axis=1)
-y = pdf["purchase_range"]
+X = pdf.drop("PURCHASE_RANGE", axis=1)
+y = pdf["PURCHASE_RANGE"]
 
 # -----------------------------
 # Encode categorical features and target
