@@ -6,11 +6,10 @@ import mlflow
 import shap
 import matplotlib.pyplot as plt
 import pandas as pd
-
 from xgboost import XGBClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, f1_score, ConfusionMatrixDisplay
-from sklearn.preprocessing import OrdinalEncoder, LabelEncoder
+from sklearn.preprocessing import LabelEncoder, OrdinalEncoder
 from snowflake.snowpark import Session
 from snowflake.snowpark.functions import when
 from mlflow.models.signature import infer_signature
@@ -24,7 +23,7 @@ connection_parameters = {
     "user": os.environ["SNOWFLAKE_USER"],
     "password": os.environ["SNOWFLAKE_PASSWORD"],
     "role": os.environ["SNOWFLAKE_ROLE"],
-    "warehouse": os.environ["SNOWFLAKE_WAREHOUSE"],
+    "warehouse": os.environ["SNOWFLAKE_WAREHOUSE"]
 }
 session = Session.builder.configs(connection_parameters).create()
 
@@ -70,39 +69,33 @@ if len(pdf) == 0:
 
 print("📋 Columns in DataFrame:", pdf.columns.tolist())
 
-X = pdf.drop("PURCHASE_RANGE", axis=1)
-y = pdf["PURCHASE_RANGE"]
+X = pdf.drop("purchase_range", axis=1)
+y = pdf["purchase_range"]
 
-# Encode categorical columns
+# -----------------------------
+# Encode categorical features and target
+# -----------------------------
 cat_cols = X.select_dtypes(include=["object"]).columns
 encoder = OrdinalEncoder()
 X[cat_cols] = encoder.fit_transform(X[cat_cols])
 
-# Encode target variable
 label_encoder = LabelEncoder()
-y = label_encoder.fit_transform(y)
-
-# Save label mapping
-os.makedirs("ml", exist_ok=True)
-with open("ml/label_mapping.json", "w") as f:
-    label_mapping = {label: int(code) for label, code in zip(label_encoder.classes_, label_encoder.transform(label_encoder.classes_))} json.dump(label_mapping, f, indent=2)
-
+y_encoded = label_encoder.fit_transform(y)
 
 # -----------------------------
 # Train model
 # -----------------------------
-X_train, X_test, y_train, y_test = train_test_split(X, y, stratify=y, random_state=42)
-model = XGBClassifier(n_estimators=300, max_depth=10, learning_rate=0.05, use_label_encoder=False,
-                      eval_metric="mlogloss", random_state=42)
+X_train, X_test, y_train, y_test = train_test_split(X, y_encoded, stratify=y_encoded, random_state=42)
+model = XGBClassifier(n_estimators=300, max_depth=10, learning_rate=0.05, use_label_encoder=False, eval_metric="mlogloss", random_state=42)
 model.fit(X_train, y_train)
 y_pred = model.predict(X_test)
-
 accuracy = accuracy_score(y_test, y_pred)
 f1 = f1_score(y_test, y_pred, average="macro")
 
 # -----------------------------
 # Save artifacts locally
 # -----------------------------
+os.makedirs("ml", exist_ok=True)
 with gzip.open("ml/model.pkl.gz", "wb") as f:
     cloudpickle.dump(model, f)
 
@@ -119,6 +112,11 @@ with open("ml/signature.json", "w") as f:
 
 with open("ml/drift_baseline.json", "w") as f:
     json.dump(pdf.describe(include='all').to_dict(), f, indent=2)
+
+# ✅ Fix for label encoding JSON serialization
+label_mapping = {label: int(code) for label, code in zip(label_encoder.classes_, label_encoder.transform(label_encoder.classes_))}
+with open("ml/label_mapping.json", "w") as f:
+    json.dump(label_mapping, f, indent=2)
 
 # -----------------------------
 # Log to MLflow
@@ -137,7 +135,8 @@ with mlflow.start_run(run_name=run_name) as run:
     mlflow.set_tag("model_version", run_name)
 
     mlflow.log_params(model.get_params())
-    mlflow.log_metrics({"accuracy": accuracy, "f1_score": f1})
+    mlflow.log_metric("accuracy", accuracy)
+    mlflow.log_metric("f1_score", f1)
 
     # Confusion matrix
     ConfusionMatrixDisplay.from_predictions(y_test, y_pred)
@@ -146,19 +145,21 @@ with mlflow.start_run(run_name=run_name) as run:
     mlflow.log_artifact("ml/confusion_matrix.png")
 
     # SHAP summary
-    explainer = shap.Explainer(model, X_test)
-    shap.summary_plot(explainer(X_test), X_test, show=False)
+    explainer = shap.TreeExplainer(model)
+    shap.summary_plot(explainer.shap_values(X_test), X_test, show=False)
     plt.savefig("ml/shap_summary.png")
     mlflow.log_artifact("ml/shap_summary.png")
 
-    # Log model and artifacts
+    # Log model using sklearn flavor
     signature = infer_signature(X_train, model.predict(X_train))
-    mlflow.sklearn.log_model(model, artifact_path="model", input_example=X.head(5), signature=signature)
+    input_example = X.head(5).astype(float)
+    mlflow.sklearn.log_model(model, artifact_path="model", input_example=input_example, signature=signature)
 
-    for file in [
-        "ml/model.pkl.gz", "ml/metrics.json",
-        "ml/signature.json", "ml/drift_baseline.json", "ml/label_mapping.json"
-    ]:
-        mlflow.log_artifact(file)
+    # Log other artifacts
+    mlflow.log_artifact("ml/model.pkl.gz")
+    mlflow.log_artifact("ml/metrics.json")
+    mlflow.log_artifact("ml/signature.json")
+    mlflow.log_artifact("ml/drift_baseline.json")
+    mlflow.log_artifact("ml/label_mapping.json")
 
-print(f"✅ Trained and logged {run_name} with accuracy = {accuracy:.4f} and F1 = {f1:.4f}")
+print(f"✅ Trained and logged {run_name} with accuracy = {accuracy:.4f}, f1 = {f1:.4f}")
