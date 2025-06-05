@@ -8,8 +8,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error, r2_score
-from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import (
+    mean_squared_error, r2_score, accuracy_score, f1_score
+)
 from snowflake.snowpark import Session
 from snowflake.snowpark.functions import when
 from catboost import CatBoostRegressor, Pool
@@ -74,16 +75,13 @@ y = pdf["CD_PURCHASE_ESTIMATE"]
 # Train-Test Split
 # -----------------------------
 X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=42)
-
-# Categorical columns
 cat_cols = X.select_dtypes(include=["object", "category"]).columns.tolist()
+train_pool = Pool(X_train, y_train, cat_features=cat_cols)
+test_pool = Pool(X_test, y_test, cat_features=cat_cols)
 
 # -----------------------------
 # Train CatBoost Regressor
 # -----------------------------
-train_pool = Pool(X_train, y_train, cat_features=cat_cols)
-test_pool = Pool(X_test, y_test, cat_features=cat_cols)
-
 model = CatBoostRegressor(
     iterations=1000,
     depth=6,
@@ -93,29 +91,43 @@ model = CatBoostRegressor(
     verbose=100,
     random_seed=42
 )
-
 model.fit(train_pool, eval_set=test_pool)
 
-# Predict and evaluate
-y_pred = model.predict(test_pool)
-rmse = np.sqrt(mean_squared_error(y_test, y_pred))
-r2 = r2_score(y_test, y_pred)
+# -----------------------------
+# Predict and Evaluate
+# -----------------------------
+y_pred_cont = model.predict(test_pool)
+
+# Binning for classification metrics
+actual_bins = pd.qcut(y_test, q=3, labels=["Low", "Medium", "High"])
+pred_bins = pd.qcut(y_pred_cont, q=3, labels=["Low", "Medium", "High"])
+
+accuracy = accuracy_score(actual_bins, pred_bins)
+f1 = f1_score(actual_bins, pred_bins, average="macro")
+rmse = np.sqrt(mean_squared_error(y_test, y_pred_cont))
+r2 = r2_score(y_test, y_pred_cont)
+
+print(f"✅ RMSE: {rmse:.2f}, R²: {r2:.4f}, Accuracy: {accuracy:.4f}, F1: {f1:.4f}")
 
 # -----------------------------
-# Wrap model and save
+# Save Artifacts
 # -----------------------------
+os.makedirs("ml", exist_ok=True)
 pipeline = {
     "model": model,
     "cat_features": cat_cols,
     "feature_order": list(X.columns)
 }
-
-os.makedirs("ml", exist_ok=True)
 with gzip.open("ml/model.pkl.gz", "wb") as f:
     cloudpickle.dump(pipeline, f)
 
 with open("ml/metrics.json", "w") as f:
-    json.dump({"rmse": rmse, "r2": r2}, f, indent=2)
+    json.dump({
+        "rmse": rmse,
+        "r2": r2,
+        "accuracy": accuracy,
+        "f1": f1
+    }, f, indent=2)
 
 with open("ml/signature.json", "w") as f:
     json.dump({
@@ -140,14 +152,15 @@ version_number = len(existing_runs) + 1
 run_name = f"catboost_regressor_v{version_number}"
 
 with mlflow.start_run(run_name=run_name) as run:
-    mlflow.set_tag("dataset_version", f"v{version_number}")
     mlflow.set_tag("model_version", run_name)
-
     mlflow.log_params(model.get_params())
-    mlflow.log_metric("rmse", rmse)
-    mlflow.log_metric("r2_score", r2)
+    mlflow.log_metrics({
+        "rmse": rmse,
+        "r2_score": r2,
+        "accuracy": accuracy,
+        "f1_score": f1
+    })
 
-    plt.figure()
     shap_values = shap.TreeExplainer(model).shap_values(X_test)
     shap.summary_plot(shap_values, X_test, show=False)
     plt.savefig("ml/shap_summary.png")
@@ -158,4 +171,4 @@ with mlflow.start_run(run_name=run_name) as run:
     mlflow.log_artifact("ml/signature.json")
     mlflow.log_artifact("ml/drift_baseline.json")
 
-print(f"✅ Trained and logged {run_name} with RMSE = {rmse:.2f}, R² = {r2:.4f}")
+print(f"✅ Logged and saved model v{version_number}")
