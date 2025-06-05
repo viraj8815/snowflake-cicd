@@ -14,7 +14,6 @@ from sklearn.pipeline import make_pipeline
 from xgboost import XGBClassifier
 from snowflake.snowpark import Session
 from snowflake.snowpark.functions import when
-from mlflow.models.signature import infer_signature
 from mlflow.tracking import MlflowClient
 
 # -----------------------------
@@ -61,7 +60,17 @@ df = (
 pdf = df.to_pandas()
 pdf.dropna(inplace=True)
 
-# Assign purchase_range using quantiles
+# -----------------------------
+# Add Engineered Features
+# -----------------------------
+pdf["IS_MARRIED"] = pdf["CD_MARITAL_STATUS"].isin(["M", "D"]).astype(int)
+pdf["HAS_COLLEGE_DEP"] = (pdf["CD_DEP_COLLEGE_COUNT"] > 0).astype(int)
+pdf["TOTAL_DEP"] = pdf["CD_DEP_COUNT"] + pdf["CD_DEP_EMPLOYED_COUNT"] + pdf["CD_DEP_COLLEGE_COUNT"]
+pdf["AGE_BIN"] = pd.cut(pdf["AGE"], bins=[0, 18, 30, 45, 60, 100], labels=[0, 1, 2, 3, 4])
+
+# -----------------------------
+# Target Variable
+# -----------------------------
 pdf["PURCHASE_RANGE"] = pd.qcut(pdf["CD_PURCHASE_ESTIMATE"], 3, labels=["Low", "Medium", "High"])
 pdf.drop(columns=["CD_PURCHASE_ESTIMATE"], inplace=True)
 
@@ -75,14 +84,16 @@ y = pdf["PURCHASE_RANGE"]
 label_encoder = LabelEncoder()
 y_encoded = label_encoder.fit_transform(y)
 
-# Split data
+# -----------------------------
+# Train-Test Split
+# -----------------------------
 X_train, X_test, y_train, y_test = train_test_split(X, y_encoded, stratify=y_encoded, random_state=42)
 
 # -----------------------------
 # Preprocessing
 # -----------------------------
-cat_cols = X.select_dtypes(include=["object"]).columns.tolist()
-num_cols = X.select_dtypes(exclude=["object"]).columns.tolist()
+cat_cols = X.select_dtypes(include=["object", "category"]).columns.tolist()
+num_cols = X.select_dtypes(exclude=["object", "category"]).columns.tolist()
 
 preprocessor = ColumnTransformer(
     transformers=[
