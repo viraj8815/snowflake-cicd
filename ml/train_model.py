@@ -10,7 +10,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, f1_score, ConfusionMatrixDisplay
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder
 from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
+from sklearn.pipeline import make_pipeline
 from xgboost import XGBClassifier
 from snowflake.snowpark import Session
 from snowflake.snowpark.functions import when
@@ -75,7 +75,12 @@ y = pdf["PURCHASE_RANGE"]
 label_encoder = LabelEncoder()
 y_encoded = label_encoder.fit_transform(y)
 
-# Encode features
+# Split data
+X_train, X_test, y_train, y_test = train_test_split(X, y_encoded, stratify=y_encoded, random_state=42)
+
+# -----------------------------
+# Preprocessing
+# -----------------------------
 cat_cols = X.select_dtypes(include=["object"]).columns.tolist()
 num_cols = X.select_dtypes(exclude=["object"]).columns.tolist()
 
@@ -86,8 +91,13 @@ preprocessor = ColumnTransformer(
     ]
 )
 
+# Fit the preprocessor and transform manually
+preprocessor.fit(X_train)
+X_train_processed = preprocessor.transform(X_train)
+X_test_processed = preprocessor.transform(X_test)
+
 # -----------------------------
-# Build model pipeline
+# Train the model with early stopping
 # -----------------------------
 model = XGBClassifier(
     n_estimators=500,
@@ -99,26 +109,20 @@ model = XGBClassifier(
     random_state=42
 )
 
-pipeline = Pipeline(steps=[
-    ("preprocessor", preprocessor),
-    ("model", model)
-])
-
-# -----------------------------
-# Train & Evaluate
-# -----------------------------
-X_train, X_test, y_train, y_test = train_test_split(X, y_encoded, stratify=y_encoded, random_state=42)
-
-pipeline.fit(
-    X_train, y_train,
-    model__eval_set=[(preprocessor.transform(X_test), y_test)],
-    model__early_stopping_rounds=20,
-    model__verbose=True
+model.fit(
+    X_train_processed, y_train,
+    eval_set=[(X_test_processed, y_test)],
+    early_stopping_rounds=20,
+    verbose=True
 )
 
-y_pred = pipeline.predict(X_test)
+# Predict and evaluate
+y_pred = model.predict(X_test_processed)
 accuracy = accuracy_score(y_test, y_pred)
 f1 = f1_score(y_test, y_pred, average="macro")
+
+# Wrap model and preprocessor for deployment
+pipeline = make_pipeline(preprocessor, model)
 
 # -----------------------------
 # Save artifacts locally
@@ -171,8 +175,8 @@ with mlflow.start_run(run_name=run_name) as run:
     mlflow.log_artifact("ml/confusion_matrix.png")
 
     # SHAP summary
-    explainer = shap.Explainer(pipeline.named_steps["model"])
-    shap.summary_plot(explainer(preprocessor.transform(X_test)), preprocessor.transform(X_test), show=False)
+    explainer = shap.Explainer(model)
+    shap.summary_plot(explainer(X_test_processed), X_test_processed, show=False)
     plt.savefig("ml/shap_summary.png")
     mlflow.log_artifact("ml/shap_summary.png")
 
