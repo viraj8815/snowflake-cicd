@@ -1,34 +1,27 @@
-import os
-import json
-import gzip
-import cloudpickle
+import os, json, gzip, cloudpickle
 import mlflow
-import shap
-import matplotlib.pyplot as plt
 import pandas as pd
-from sklearn.ensemble import RandomForestClassifier
+import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, ConfusionMatrixDisplay
+from sklearn.metrics import accuracy_score, f1_score, ConfusionMatrixDisplay
 from snowflake.snowpark import Session
 from snowflake.snowpark.functions import when
+from sklearn.preprocessing import OrdinalEncoder
 from mlflow.models.signature import infer_signature
 from mlflow.tracking import MlflowClient
+from xgboost import XGBClassifier
 
-# -----------------------------
 # Snowflake connection
-# -----------------------------
 connection_parameters = {
     "account": os.environ["SNOWFLAKE_ACCOUNT"],
     "user": os.environ["SNOWFLAKE_USER"],
     "password": os.environ["SNOWFLAKE_PASSWORD"],
     "role": os.environ["SNOWFLAKE_ROLE"],
-    "warehouse": os.environ["SNOWFLAKE_WAREHOUSE"],
+    "warehouse": os.environ["SNOWFLAKE_WAREHOUSE"]
 }
 session = Session.builder.configs(connection_parameters).create()
 
-# -----------------------------
-# Load and join 3 tables
-# -----------------------------
+# Load training tables
 cust = session.table("ML_DB.TRAINING_DATA.CUSTOMER_SAMPLE")
 demo = session.table("ML_DB.TRAINING_DATA.CUSTOMER_DEMOGRAPHICS_SAMPLE")
 date = session.table("ML_DB.TRAINING_DATA.DATE_DIM_SAMPLE")
@@ -57,45 +50,35 @@ df = (
         .limit(10000)
 )
 
-# -----------------------------
-# Convert to Pandas
-# -----------------------------
 pdf = df.to_pandas()
 pdf.dropna(inplace=True)
-
 if len(pdf) == 0:
-    raise ValueError("No rows available for training.")
+    raise ValueError("No data for training.")
 
-print("📋 Columns in DataFrame:", pdf.columns.tolist())
+X = pdf.drop("purchase_range", axis=1)
+y = pdf["purchase_range"]
 
-X = pdf.drop("PURCHASE_RANGE", axis=1)
-y = pdf["PURCHASE_RANGE"]
-X = pd.get_dummies(X)
+# Ordinal encode categoricals
+cat_cols = X.select_dtypes(include=["object"]).columns
+encoder = OrdinalEncoder()
+X[cat_cols] = encoder.fit_transform(X[cat_cols])
 
-# -----------------------------
 # Train model
-# -----------------------------
-X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=42)
-model = RandomForestClassifier(
-    n_estimators=200,
-    max_depth=25,
-    class_weight="balanced",
-    random_state=42
-)
+X_train, X_test, y_train, y_test = train_test_split(X, y, stratify=y, random_state=42)
+model = XGBClassifier(n_estimators=300, max_depth=10, learning_rate=0.05, use_label_encoder=False, eval_metric="mlogloss", random_state=42)
 model.fit(X_train, y_train)
+
+# Evaluate
 y_pred = model.predict(X_test)
 accuracy = accuracy_score(y_test, y_pred)
+f1 = f1_score(y_test, y_pred, average="macro")
 
-# -----------------------------
-# Save artifacts locally
-# -----------------------------
+# Save artifacts
 os.makedirs("ml", exist_ok=True)
 with gzip.open("ml/model.pkl.gz", "wb") as f:
     cloudpickle.dump(model, f)
-
 with open("ml/metrics.json", "w") as f:
-    json.dump({"accuracy": accuracy}, f, indent=2)
-
+    json.dump({"accuracy": accuracy, "f1_score": f1}, f, indent=2)
 with open("ml/signature.json", "w") as f:
     json.dump({
         "inputs": list(X.columns),
@@ -103,28 +86,24 @@ with open("ml/signature.json", "w") as f:
         "model_type": model.__class__.__name__,
         "hyperparams": model.get_params()
     }, f, indent=2)
-
 with open("ml/drift_baseline.json", "w") as f:
     json.dump(pdf.describe(include='all').to_dict(), f, indent=2)
 
-# -----------------------------
-# Log to MLflow
-# -----------------------------
+# MLflow logging
 experiment_name = "snowflake-ml-model"
 mlflow.set_experiment(experiment_name)
-
 client = MlflowClient()
 experiment = client.get_experiment_by_name(experiment_name)
 existing_runs = client.search_runs(experiment.experiment_id)
 version_number = len(existing_runs) + 1
-run_name = f"rf_model_v{version_number}"
+run_name = f"xgb_model_v{version_number}"
 
-with mlflow.start_run(run_name=run_name) as run:
+with mlflow.start_run(run_name=run_name):
     mlflow.set_tag("dataset_version", f"v{version_number}")
     mlflow.set_tag("model_version", run_name)
-
     mlflow.log_params(model.get_params())
     mlflow.log_metric("accuracy", accuracy)
+    mlflow.log_metric("f1_score", f1)
 
     # Confusion matrix
     ConfusionMatrixDisplay.from_estimator(model, X_test, y_test)
@@ -132,21 +111,15 @@ with mlflow.start_run(run_name=run_name) as run:
     plt.savefig("ml/confusion_matrix.png")
     mlflow.log_artifact("ml/confusion_matrix.png")
 
-    # SHAP summary
-    explainer = shap.TreeExplainer(model)
-    shap.summary_plot(explainer.shap_values(X_test), X_test, show=False)
-    plt.savefig("ml/shap_summary.png")
-    mlflow.log_artifact("ml/shap_summary.png")
-
-    # Log model using sklearn flavor
+    # Log model
     signature = infer_signature(X_train, model.predict(X_train))
     input_example = X.head(5).astype(int)
     mlflow.sklearn.log_model(model, artifact_path="model", input_example=input_example, signature=signature)
 
-    # Log other artifacts
+    # Log files
     mlflow.log_artifact("ml/model.pkl.gz")
     mlflow.log_artifact("ml/metrics.json")
     mlflow.log_artifact("ml/signature.json")
     mlflow.log_artifact("ml/drift_baseline.json")
 
-print(f"✅ Trained and logged {run_name} with accuracy = {accuracy:.4f}")
+print(f"✅ Trained XGBClassifier v{version_number} | Accuracy: {accuracy:.4f} | F1 Score: {f1:.4f}")
