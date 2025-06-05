@@ -64,6 +64,8 @@ df = (
 pdf = df.to_pandas()
 pdf.dropna(inplace=True)
 
+print("📊 Class Distribution:\n", pdf["PURCHASE_RANGE"].value_counts())
+
 if len(pdf) == 0:
     raise ValueError("No rows available for training.")
 
