@@ -5,15 +5,13 @@ import cloudpickle
 import mlflow
 import shap
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import (
-    mean_squared_error, r2_score, accuracy_score, f1_score
-)
+from sklearn.metrics import accuracy_score, f1_score, ConfusionMatrixDisplay
+from sklearn.preprocessing import LabelEncoder
 from snowflake.snowpark import Session
 from snowflake.snowpark.functions import when
-from catboost import CatBoostRegressor, Pool
+from catboost import CatBoostClassifier, Pool
 from mlflow.tracking import MlflowClient
 
 # -----------------------------
@@ -68,58 +66,51 @@ pdf["HAS_COLLEGE_DEP"] = (pdf["CD_DEP_COLLEGE_COUNT"] > 0).astype(int)
 pdf["TOTAL_DEP"] = pdf["CD_DEP_COUNT"] + pdf["CD_DEP_EMPLOYED_COUNT"] + pdf["CD_DEP_COLLEGE_COUNT"]
 pdf["AGE_BIN"] = pd.cut(pdf["AGE"], bins=[0, 18, 30, 45, 60, 100], labels=["0", "1", "2", "3", "4"]).astype(str)
 
-X = pdf.drop(columns=["CD_PURCHASE_ESTIMATE"])
-y = pdf["CD_PURCHASE_ESTIMATE"]
+# -----------------------------
+# Convert target to class labels
+# -----------------------------
+pdf["PURCHASE_RANGE"] = pd.qcut(
+    pdf["CD_PURCHASE_ESTIMATE"], q=3, labels=["Low", "Medium", "High"]
+)
+X = pdf.drop(columns=["CD_PURCHASE_ESTIMATE", "PURCHASE_RANGE"])
+y = pdf["PURCHASE_RANGE"]
+
+# -----------------------------
+# Encode target
+# -----------------------------
+label_encoder = LabelEncoder()
+y_encoded = label_encoder.fit_transform(y)
 
 # -----------------------------
 # Train-Test Split
 # -----------------------------
-X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=42)
+X_train, X_test, y_train, y_test = train_test_split(X, y_encoded, stratify=y_encoded, random_state=42)
+
 cat_cols = X.select_dtypes(include=["object", "category"]).columns.tolist()
 train_pool = Pool(X_train, y_train, cat_features=cat_cols)
 test_pool = Pool(X_test, y_test, cat_features=cat_cols)
 
 # -----------------------------
-# Train CatBoost Regressor
+# Train Classifier
 # -----------------------------
-model = CatBoostRegressor(
-    iterations=2000,
+model = CatBoostClassifier(
+    iterations=1000,
     depth=6,
     learning_rate=0.03,
-    loss_function="RMSE",
-    early_stopping_rounds=5,
+    loss_function="MultiClass",
+    early_stopping_rounds=10,
     verbose=100,
     random_seed=42
 )
 model.fit(train_pool, eval_set=test_pool)
 
 # -----------------------------
-# Predict and Evaluate
+# Evaluate
 # -----------------------------
-y_pred_cont = model.predict(test_pool)
-
-# Binning for classification metrics
-actual_bins = pd.qcut(y_test, q=3, labels=["Low", "Medium", "High"])
-try:
-    pred_bins = pd.qcut(y_pred_cont, q=3, labels=["Low", "Medium", "High"], duplicates='drop')
-    actual_bins = pd.qcut(y_test, q=3, labels=["Low", "Medium", "High"], duplicates='drop')
-except ValueError as e:
-    print(f"⚠️ Binning failed due to insufficient variation: {e}")
-    pred_bins = pd.Series(["Unknown"] * len(y_pred_cont))
-    actual_bins = pd.Series(["Unknown"] * len(y_test))
-    accuracy = 0.0
-    f1 = 0.0
-else:
-    accuracy = accuracy_score(actual_bins, pred_bins)
-    f1 = f1_score(actual_bins, pred_bins, average="macro")
-
-
-accuracy = accuracy_score(actual_bins, pred_bins)
-f1 = f1_score(actual_bins, pred_bins, average="macro")
-rmse = np.sqrt(mean_squared_error(y_test, y_pred_cont))
-r2 = r2_score(y_test, y_pred_cont)
-
-print(f"✅ RMSE: {rmse:.2f}, R²: {r2:.4f}, Accuracy: {accuracy:.4f}, F1: {f1:.4f}")
+y_pred = model.predict(X_test)
+accuracy = accuracy_score(y_test, y_pred)
+f1 = f1_score(y_test, y_pred, average="macro")
+print(f"✅ Accuracy: {accuracy:.4f}, F1: {f1:.4f}")
 
 # -----------------------------
 # Save Artifacts
@@ -128,23 +119,19 @@ os.makedirs("ml", exist_ok=True)
 pipeline = {
     "model": model,
     "cat_features": cat_cols,
+    "label_encoder": label_encoder,
     "feature_order": list(X.columns)
 }
 with gzip.open("ml/model.pkl.gz", "wb") as f:
     cloudpickle.dump(pipeline, f)
 
 with open("ml/metrics.json", "w") as f:
-    json.dump({
-        "rmse": rmse,
-        "r2": r2,
-        "accuracy": accuracy,
-        "f1": f1
-    }, f, indent=2)
+    json.dump({"accuracy": accuracy, "f1": f1}, f, indent=2)
 
 with open("ml/signature.json", "w") as f:
     json.dump({
         "inputs": list(X.columns),
-        "output": "CD_PURCHASE_ESTIMATE",
+        "output": "PURCHASE_RANGE",
         "model_type": model.__class__.__name__,
         "hyperparams": model.get_params()
     }, f, indent=2)
@@ -155,23 +142,23 @@ with open("ml/drift_baseline.json", "w") as f:
 # -----------------------------
 # Log to MLflow
 # -----------------------------
-experiment_name = "snowflake-ml-model-regression"
+experiment_name = "snowflake-ml-model-classification"
 mlflow.set_experiment(experiment_name)
 client = MlflowClient()
 experiment = client.get_experiment_by_name(experiment_name)
 existing_runs = client.search_runs(experiment.experiment_id)
 version_number = len(existing_runs) + 1
-run_name = f"catboost_regressor_v{version_number}"
+run_name = f"catboost_classifier_v{version_number}"
 
 with mlflow.start_run(run_name=run_name) as run:
     mlflow.set_tag("model_version", run_name)
     mlflow.log_params(model.get_params())
-    mlflow.log_metrics({
-        "rmse": rmse,
-        "r2_score": r2,
-        "accuracy": accuracy,
-        "f1_score": f1
-    })
+    mlflow.log_metrics({"accuracy": accuracy, "f1_score": f1})
+
+    ConfusionMatrixDisplay.from_predictions(y_test, y_pred)
+    plt.title("Confusion Matrix")
+    plt.savefig("ml/confusion_matrix.png")
+    mlflow.log_artifact("ml/confusion_matrix.png")
 
     shap_values = shap.TreeExplainer(model).shap_values(X_test)
     shap.summary_plot(shap_values, X_test, show=False)
@@ -183,4 +170,4 @@ with mlflow.start_run(run_name=run_name) as run:
     mlflow.log_artifact("ml/signature.json")
     mlflow.log_artifact("ml/drift_baseline.json")
 
-print(f"✅ Logged and saved model v{version_number}")
+print(f"✅ Trained and logged {run_name} with Accuracy = {accuracy:.4f}, F1 = {f1:.4f}")
