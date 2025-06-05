@@ -83,11 +83,11 @@ test_pool = Pool(X_test, y_test, cat_features=cat_cols)
 # Train CatBoost Regressor
 # -----------------------------
 model = CatBoostRegressor(
-    iterations=1000,
+    iterations=2000,
     depth=6,
     learning_rate=0.03,
     loss_function="RMSE",
-    early_stopping_rounds=20,
+    early_stopping_rounds=5,
     verbose=100,
     random_seed=42
 )
@@ -100,7 +100,19 @@ y_pred_cont = model.predict(test_pool)
 
 # Binning for classification metrics
 actual_bins = pd.qcut(y_test, q=3, labels=["Low", "Medium", "High"])
-pred_bins = pd.qcut(y_pred_cont, q=3, labels=["Low", "Medium", "High"], duplicates='drop')
+try:
+    pred_bins = pd.qcut(y_pred_cont, q=3, labels=["Low", "Medium", "High"], duplicates='drop')
+    actual_bins = pd.qcut(y_test, q=3, labels=["Low", "Medium", "High"], duplicates='drop')
+except ValueError as e:
+    print(f"⚠️ Binning failed due to insufficient variation: {e}")
+    pred_bins = pd.Series(["Unknown"] * len(y_pred_cont))
+    actual_bins = pd.Series(["Unknown"] * len(y_test))
+    accuracy = 0.0
+    f1 = 0.0
+else:
+    accuracy = accuracy_score(actual_bins, pred_bins)
+    f1 = f1_score(actual_bins, pred_bins, average="macro")
+
 
 accuracy = accuracy_score(actual_bins, pred_bins)
 f1 = f1_score(actual_bins, pred_bins, average="macro")
