@@ -100,7 +100,7 @@ y_pred_cont = model.predict(test_pool)
 
 # Binning for classification metrics
 actual_bins = pd.qcut(y_test, q=3, labels=["Low", "Medium", "High"])
-pred_bins = pd.qcut(y_pred_cont, q=3, labels=["Low", "Medium", "High"])
+pred_bins = pd.qcut(y_pred_cont, q=3, labels=["Low", "Medium", "High"], duplicates='drop')
 
 accuracy = accuracy_score(actual_bins, pred_bins)
 f1 = f1_score(actual_bins, pred_bins, average="macro")
