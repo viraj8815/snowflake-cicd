@@ -85,7 +85,8 @@ y = label_encoder.fit_transform(y)
 # Save label mapping
 os.makedirs("ml", exist_ok=True)
 with open("ml/label_mapping.json", "w") as f:
-    json.dump(dict(zip(label_encoder.classes_, label_encoder.transform(label_encoder.classes_))), f, indent=2)
+    label_mapping = {label: int(code) for label, code in zip(label_encoder.classes_, label_encoder.transform(label_encoder.classes_))} json.dump(label_mapping, f, indent=2)
+
 
 # -----------------------------
 # Train model
