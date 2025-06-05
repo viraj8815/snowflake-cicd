@@ -11,3 +11,4 @@ shap
 matplotlib
 xgboost
 xgboost==1.7.6
+catboost

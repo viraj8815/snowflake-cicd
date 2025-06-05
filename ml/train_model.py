@@ -8,12 +8,10 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, f1_score, ConfusionMatrixDisplay
-from sklearn.preprocessing import LabelEncoder, OneHotEncoder
-from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import make_pipeline
-from xgboost import XGBClassifier
+from sklearn.preprocessing import LabelEncoder
 from snowflake.snowpark import Session
 from snowflake.snowpark.functions import when
+from catboost import CatBoostClassifier, Pool
 from mlflow.tracking import MlflowClient
 
 # -----------------------------
@@ -55,13 +53,13 @@ df = (
 )
 
 # -----------------------------
-# Convert to Pandas
+# Convert to Pandas and clean
 # -----------------------------
 pdf = df.to_pandas()
 pdf.dropna(inplace=True)
 
 # -----------------------------
-# Add Engineered Features
+# Feature Engineering
 # -----------------------------
 pdf["IS_MARRIED"] = pdf["CD_MARITAL_STATUS"].isin(["M", "D"]).astype(int)
 pdf["HAS_COLLEGE_DEP"] = (pdf["CD_DEP_COLLEGE_COUNT"] > 0).astype(int)
@@ -89,51 +87,41 @@ y_encoded = label_encoder.fit_transform(y)
 # -----------------------------
 X_train, X_test, y_train, y_test = train_test_split(X, y_encoded, stratify=y_encoded, random_state=42)
 
-# -----------------------------
-# Preprocessing
-# -----------------------------
+# Categorical columns (CatBoost handles them natively)
 cat_cols = X.select_dtypes(include=["object", "category"]).columns.tolist()
-num_cols = X.select_dtypes(exclude=["object", "category"]).columns.tolist()
-
-preprocessor = ColumnTransformer(
-    transformers=[
-        ("cat", OneHotEncoder(handle_unknown="ignore", sparse_output=False), cat_cols),
-        ("num", "passthrough", num_cols)
-    ]
-)
-
-# Fit the preprocessor and transform manually
-preprocessor.fit(X_train)
-X_train_processed = preprocessor.transform(X_train)
-X_test_processed = preprocessor.transform(X_test)
 
 # -----------------------------
-# Train the model with early stopping
+# Train CatBoost Model
 # -----------------------------
-model = XGBClassifier(
-    n_estimators=500,
-    max_depth=6,
-    learning_rate=0.05,
-    subsample=0.8,
-    colsample_bytree=0.8,
-    eval_metric="mlogloss",
-    random_state=42
-)
+train_pool = Pool(X_train, y_train, cat_features=cat_cols)
+test_pool = Pool(X_test, y_test, cat_features=cat_cols)
 
-model.fit(
-    X_train_processed, y_train,
-    eval_set=[(X_test_processed, y_test)],
+model = CatBoostClassifier(
+    iterations=1000,
+    depth=6,
+    learning_rate=0.03,
+    eval_metric="MultiClass",
     early_stopping_rounds=20,
-    verbose=True
+    verbose=100,
+    random_seed=42
 )
+
+model.fit(train_pool, eval_set=test_pool)
 
 # Predict and evaluate
-y_pred = model.predict(X_test_processed)
+y_pred = model.predict(test_pool)
 accuracy = accuracy_score(y_test, y_pred)
 f1 = f1_score(y_test, y_pred, average="macro")
 
-# Wrap model and preprocessor for deployment
-pipeline = make_pipeline(preprocessor, model)
+# -----------------------------
+# Wrap model with data for saving
+# -----------------------------
+pipeline = {
+    "model": model,
+    "cat_features": cat_cols,
+    "label_encoder": label_encoder,
+    "feature_order": list(X.columns)
+}
 
 # -----------------------------
 # Save artifacts locally
@@ -169,7 +157,7 @@ client = MlflowClient()
 experiment = client.get_experiment_by_name(experiment_name)
 existing_runs = client.search_runs(experiment.experiment_id)
 version_number = len(existing_runs) + 1
-run_name = f"xgb_model_v{version_number}"
+run_name = f"catboost_model_v{version_number}"
 
 with mlflow.start_run(run_name=run_name) as run:
     mlflow.set_tag("dataset_version", f"v{version_number}")
@@ -185,9 +173,10 @@ with mlflow.start_run(run_name=run_name) as run:
     plt.savefig("ml/confusion_matrix.png")
     mlflow.log_artifact("ml/confusion_matrix.png")
 
-    # SHAP summary
-    explainer = shap.Explainer(model)
-    shap.summary_plot(explainer(X_test_processed), X_test_processed, show=False)
+    # SHAP summary (CatBoost-specific)
+    explainer = shap.TreeExplainer(model)
+    shap_values = explainer.shap_values(X_test)
+    shap.summary_plot(shap_values, X_test, show=False)
     plt.savefig("ml/shap_summary.png")
     mlflow.log_artifact("ml/shap_summary.png")
 
