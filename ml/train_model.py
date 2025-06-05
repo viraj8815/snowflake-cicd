@@ -94,11 +94,11 @@ test_pool = Pool(X_test, y_test, cat_features=cat_cols)
 # Train Classifier
 # -----------------------------
 model = CatBoostClassifier(
-    iterations=1000,
+    iterations=2000,
     depth=6,
     learning_rate=0.03,
     loss_function="MultiClass",
-    early_stopping_rounds=10,
+    early_stopping_rounds=5,
     verbose=100,
     random_seed=42
 )
