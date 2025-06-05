@@ -8,10 +8,12 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, f1_score, ConfusionMatrixDisplay
-from sklearn.preprocessing import LabelEncoder, OrdinalEncoder
+from sklearn.preprocessing import LabelEncoder, OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from xgboost import XGBClassifier
 from snowflake.snowpark import Session
 from snowflake.snowpark.functions import when
-from xgboost import XGBClassifier
 from mlflow.models.signature import infer_signature
 from mlflow.tracking import MlflowClient
 
@@ -69,37 +71,52 @@ print("📋 Columns in DataFrame:", pdf.columns.tolist())
 X = pdf.drop("PURCHASE_RANGE", axis=1)
 y = pdf["PURCHASE_RANGE"]
 
-# Encode categorical features
-cat_cols = X.select_dtypes(include=["object"]).columns
-encoder = OrdinalEncoder()
-X[cat_cols] = encoder.fit_transform(X[cat_cols])
-
 # Encode target
 label_encoder = LabelEncoder()
 y_encoded = label_encoder.fit_transform(y)
 
-# -----------------------------
-# Train model
-# -----------------------------
-X_train, X_test, y_train, y_test = train_test_split(X, y_encoded, stratify=y_encoded, random_state=42)
+# Encode features
+cat_cols = X.select_dtypes(include=["object"]).columns.tolist()
+num_cols = X.select_dtypes(exclude=["object"]).columns.tolist()
 
+preprocessor = ColumnTransformer(
+    transformers=[
+        ("cat", OneHotEncoder(handle_unknown="ignore", sparse_output=False), cat_cols),
+        ("num", "passthrough", num_cols)
+    ]
+)
+
+# -----------------------------
+# Build model pipeline
+# -----------------------------
 model = XGBClassifier(
-    n_estimators=1000,
+    n_estimators=500,
     max_depth=6,
-    learning_rate=0.03,
+    learning_rate=0.05,
     subsample=0.8,
     colsample_bytree=0.8,
     eval_metric="mlogloss",
     random_state=42
 )
 
-model.fit(
+pipeline = Pipeline(steps=[
+    ("preprocessor", preprocessor),
+    ("model", model)
+])
+
+# -----------------------------
+# Train & Evaluate
+# -----------------------------
+X_train, X_test, y_train, y_test = train_test_split(X, y_encoded, stratify=y_encoded, random_state=42)
+
+pipeline.fit(
     X_train, y_train,
-    eval_set=[(X_test, y_test)],
-    verbose=True
+    model__eval_set=[(preprocessor.transform(X_test), y_test)],
+    model__early_stopping_rounds=20,
+    model__verbose=True
 )
 
-y_pred = model.predict(X_test)
+y_pred = pipeline.predict(X_test)
 accuracy = accuracy_score(y_test, y_pred)
 f1 = f1_score(y_test, y_pred, average="macro")
 
@@ -108,7 +125,7 @@ f1 = f1_score(y_test, y_pred, average="macro")
 # -----------------------------
 os.makedirs("ml", exist_ok=True)
 with gzip.open("ml/model.pkl.gz", "wb") as f:
-    cloudpickle.dump(model, f)
+    cloudpickle.dump(pipeline, f)
 
 with open("ml/metrics.json", "w") as f:
     json.dump({"accuracy": accuracy, "f1": f1}, f, indent=2)
@@ -133,7 +150,6 @@ with open("ml/label_mapping.json", "w") as f:
 # -----------------------------
 experiment_name = "snowflake-ml-model"
 mlflow.set_experiment(experiment_name)
-
 client = MlflowClient()
 experiment = client.get_experiment_by_name(experiment_name)
 existing_runs = client.search_runs(experiment.experiment_id)
@@ -155,8 +171,8 @@ with mlflow.start_run(run_name=run_name) as run:
     mlflow.log_artifact("ml/confusion_matrix.png")
 
     # SHAP summary
-    explainer = shap.Explainer(model)
-    shap.summary_plot(explainer(X_test), X_test, show=False)
+    explainer = shap.Explainer(pipeline.named_steps["model"])
+    shap.summary_plot(explainer(preprocessor.transform(X_test)), preprocessor.transform(X_test), show=False)
     plt.savefig("ml/shap_summary.png")
     mlflow.log_artifact("ml/shap_summary.png")
 
