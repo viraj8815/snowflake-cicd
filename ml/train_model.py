@@ -6,9 +6,11 @@ import mlflow
 import shap
 import matplotlib.pyplot as plt
 import pandas as pd
-from sklearn.model_selection import train_test_split
+import numpy as np
+from sklearn.model_selection import train_test_split, RandomizedSearchCV
 from sklearn.metrics import accuracy_score, f1_score, ConfusionMatrixDisplay
 from sklearn.preprocessing import LabelEncoder
+from sklearn.utils.class_weight import compute_class_weight
 from snowflake.snowpark import Session
 from snowflake.snowpark.functions import when
 from catboost import CatBoostClassifier, Pool
@@ -86,23 +88,47 @@ y_encoded = label_encoder.fit_transform(y)
 # -----------------------------
 X_train, X_test, y_train, y_test = train_test_split(X, y_encoded, stratify=y_encoded, random_state=42)
 
-cat_cols = X.select_dtypes(include=["object", "category"]).columns.tolist()
-train_pool = Pool(X_train, y_train, cat_features=cat_cols)
-test_pool = Pool(X_test, y_test, cat_features=cat_cols)
+# -----------------------------
+# Class Weights
+# -----------------------------
+class_weights_arr = compute_class_weight("balanced", classes=np.unique(y_train), y=y_train)
+class_weights = {i: w for i, w in enumerate(class_weights_arr)}
 
 # -----------------------------
-# Train Classifier
+# CatBoost with RandomizedSearchCV
 # -----------------------------
-model = CatBoostClassifier(
-    iterations=2000,
-    depth=6,
-    learning_rate=0.03,
+cat_cols = X.select_dtypes(include=["object", "category"]).columns.tolist()
+
+param_grid = {
+    "depth": [4, 6, 8, 10],
+    "learning_rate": [0.01, 0.03, 0.05, 0.1],
+    "iterations": [300, 500, 1000],
+    "l2_leaf_reg": [1, 3, 5, 7, 9],
+    "border_count": [32, 64, 128],
+}
+
+base_model = CatBoostClassifier(
     loss_function="MultiClass",
-    early_stopping_rounds=5,
-    verbose=100,
+    cat_features=cat_cols,
+    early_stopping_rounds=10,
+    class_weights=class_weights,
+    verbose=0,
     random_seed=42
 )
-model.fit(train_pool, eval_set=test_pool)
+
+search = RandomizedSearchCV(
+    estimator=base_model,
+    param_distributions=param_grid,
+    n_iter=20,
+    scoring="accuracy",
+    cv=3,
+    verbose=2,
+    n_jobs=-1
+)
+
+search.fit(X_train, y_train)
+model = search.best_estimator_
+print("✅ Best Params:", search.best_params_)
 
 # -----------------------------
 # Evaluate
@@ -142,13 +168,13 @@ with open("ml/drift_baseline.json", "w") as f:
 # -----------------------------
 # Log to MLflow
 # -----------------------------
-experiment_name = "snowflake-ml-model-classification"
+experiment_name = "snowflake-ml-model-classifier-tuned"
 mlflow.set_experiment(experiment_name)
 client = MlflowClient()
 experiment = client.get_experiment_by_name(experiment_name)
 existing_runs = client.search_runs(experiment.experiment_id)
 version_number = len(existing_runs) + 1
-run_name = f"catboost_classifier_v{version_number}"
+run_name = f"catboost_classifier_tuned_v{version_number}"
 
 with mlflow.start_run(run_name=run_name) as run:
     mlflow.set_tag("model_version", run_name)
@@ -170,4 +196,4 @@ with mlflow.start_run(run_name=run_name) as run:
     mlflow.log_artifact("ml/signature.json")
     mlflow.log_artifact("ml/drift_baseline.json")
 
-print(f"✅ Trained and logged {run_name} with Accuracy = {accuracy:.4f}, F1 = {f1:.4f}")
+print(f"✅ Final Accuracy: {accuracy:.4f}, F1 Score: {f1:.4f}, Version: {version_number}")
