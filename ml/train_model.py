@@ -13,7 +13,7 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.utils.class_weight import compute_class_weight
 from snowflake.snowpark import Session
 from snowflake.snowpark.functions import when
-from catboost import CatBoostClassifier, Pool
+from catboost import CatBoostClassifier
 from mlflow.tracking import MlflowClient
 
 # -----------------------------
@@ -69,11 +69,9 @@ pdf["TOTAL_DEP"] = pdf["CD_DEP_COUNT"] + pdf["CD_DEP_EMPLOYED_COUNT"] + pdf["CD_
 pdf["AGE_BIN"] = pd.cut(pdf["AGE"], bins=[0, 18, 30, 45, 60, 100], labels=["0", "1", "2", "3", "4"]).astype(str)
 
 # -----------------------------
-# Convert target to class labels
+# Convert target to classes
 # -----------------------------
-pdf["PURCHASE_RANGE"] = pd.qcut(
-    pdf["CD_PURCHASE_ESTIMATE"], q=3, labels=["Low", "Medium", "High"]
-)
+pdf["PURCHASE_RANGE"] = pd.qcut(pdf["CD_PURCHASE_ESTIMATE"], q=3, labels=["Low", "Medium", "High"])
 X = pdf.drop(columns=["CD_PURCHASE_ESTIMATE", "PURCHASE_RANGE"])
 y = pdf["PURCHASE_RANGE"]
 
@@ -84,25 +82,24 @@ label_encoder = LabelEncoder()
 y_encoded = label_encoder.fit_transform(y)
 
 # -----------------------------
-# Train-Test Split
+# Split data
 # -----------------------------
 X_train, X_test, y_train, y_test = train_test_split(X, y_encoded, stratify=y_encoded, random_state=42)
+cat_cols = X.select_dtypes(include=["object", "category"]).columns.tolist()
 
 # -----------------------------
-# Class Weights
+# Compute class weights
 # -----------------------------
 class_weights_arr = compute_class_weight("balanced", classes=np.unique(y_train), y=y_train)
 class_weights = {i: w for i, w in enumerate(class_weights_arr)}
 
 # -----------------------------
-# CatBoost with RandomizedSearchCV
+# Define hyperparameter search
 # -----------------------------
-cat_cols = X.select_dtypes(include=["object", "category"]).columns.tolist()
-
 param_grid = {
-    "depth": [4, 6, 8, 10],
-    "learning_rate": [0.01, 0.03, 0.05, 0.1],
-    "iterations": [300, 500, 1000],
+    "depth": [6, 8, 10, 12],
+    "learning_rate": [0.01, 0.03, 0.05],
+    "iterations": [500, 1000, 1500, 2000],
     "l2_leaf_reg": [1, 3, 5, 7, 9],
     "border_count": [32, 64, 128],
 }
@@ -119,7 +116,7 @@ base_model = CatBoostClassifier(
 search = RandomizedSearchCV(
     estimator=base_model,
     param_distributions=param_grid,
-    n_iter=20,
+    n_iter=30,  # increase for deeper search
     scoring="accuracy",
     cv=3,
     verbose=2,
@@ -131,7 +128,7 @@ model = search.best_estimator_
 print("✅ Best Params:", search.best_params_)
 
 # -----------------------------
-# Evaluate
+# Evaluate model
 # -----------------------------
 y_pred = model.predict(X_test)
 accuracy = accuracy_score(y_test, y_pred)
@@ -139,7 +136,7 @@ f1 = f1_score(y_test, y_pred, average="macro")
 print(f"✅ Accuracy: {accuracy:.4f}, F1: {f1:.4f}")
 
 # -----------------------------
-# Save Artifacts
+# Save artifacts
 # -----------------------------
 os.makedirs("ml", exist_ok=True)
 pipeline = {
@@ -168,13 +165,13 @@ with open("ml/drift_baseline.json", "w") as f:
 # -----------------------------
 # Log to MLflow
 # -----------------------------
-experiment_name = "snowflake-ml-model-classifier-tuned"
+experiment_name = "snowflake-ml-model-classifier-optimized"
 mlflow.set_experiment(experiment_name)
 client = MlflowClient()
 experiment = client.get_experiment_by_name(experiment_name)
 existing_runs = client.search_runs(experiment.experiment_id)
 version_number = len(existing_runs) + 1
-run_name = f"catboost_classifier_tuned_v{version_number}"
+run_name = f"catboost_classifier_opt_v{version_number}"
 
 with mlflow.start_run(run_name=run_name) as run:
     mlflow.set_tag("model_version", run_name)
