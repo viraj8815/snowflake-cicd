@@ -8,12 +8,14 @@ import shutil
 # -----------------------------
 # Snowflake connection
 # -----------------------------
+snowflake_db = os.environ["SNOWFLAKE_DATABASE"]
+
 conn = snowflake.connector.connect(
     user=os.environ["SNOWFLAKE_USER"],
     password=os.environ["SNOWFLAKE_PASSWORD"],
     account=os.environ["SNOWFLAKE_ACCOUNT"],
     warehouse=os.environ["SNOWFLAKE_WAREHOUSE"],
-    database=os.environ["SNOWFLAKE_DATABASE"],
+    database=snowflake_db,
     schema=os.environ["SNOWFLAKE_SCHEMA"],
     role=os.environ["SNOWFLAKE_ROLE"]
 )
@@ -29,8 +31,8 @@ accuracy = float(metrics.get("accuracy", 0.0))
 # -----------------------------
 # Ensure MODEL_HISTORY table exists
 # -----------------------------
-cursor.execute("""
-    CREATE TABLE IF NOT EXISTS STAGE_DB.PUBLIC.MODEL_HISTORY (
+cursor.execute(f"""
+    CREATE TABLE IF NOT EXISTS {snowflake_db}.PUBLIC.MODEL_HISTORY (
         version STRING,
         accuracy FLOAT,
         deployed_on TIMESTAMP,
@@ -39,14 +41,14 @@ cursor.execute("""
 """)
 
 # -----------------------------
-# Get current best accuracy
+# Get current best accuracy and last version
 # -----------------------------
-cursor.execute("SELECT MAX(TRY_CAST(version AS INT)) FROM STAGE_DB.PUBLIC.MODEL_HISTORY")
+cursor.execute(f"SELECT MAX(TRY_CAST(version AS INT)) FROM {snowflake_db}.PUBLIC.MODEL_HISTORY")
 row = cursor.fetchone()
 last_version = int(row[0]) if row[0] is not None else 0
 version = str(last_version + 1)
 
-cursor.execute("SELECT MAX(accuracy) FROM STAGE_DB.PUBLIC.MODEL_HISTORY")
+cursor.execute(f"SELECT MAX(accuracy) FROM {snowflake_db}.PUBLIC.MODEL_HISTORY")
 best_accuracy = cursor.fetchone()[0] or 0.0
 
 # -----------------------------
@@ -81,9 +83,9 @@ if accuracy > best_accuracy:
     # -----------------------------
     # Insert into MODEL_HISTORY and update champion
     # -----------------------------
-    cursor.execute("UPDATE STAGE_DB.PUBLIC.MODEL_HISTORY SET is_champion = FALSE")
+    cursor.execute(f"UPDATE {snowflake_db}.PUBLIC.MODEL_HISTORY SET is_champion = FALSE")
     cursor.execute(f"""
-        INSERT INTO STAGE_DB.PUBLIC.MODEL_HISTORY 
+        INSERT INTO {snowflake_db}.PUBLIC.MODEL_HISTORY 
         (version, accuracy, deployed_on, is_champion)
         VALUES ('{version}', {accuracy}, CURRENT_TIMESTAMP(), TRUE)
     """)
