@@ -100,14 +100,14 @@ param_grid = {
     "depth": [10],
     "learning_rate": [0.05],
     "iterations": [1000],
-    "l2_leaf_reg": [3],
+    "l2_leaf_reg": [1],
     "border_count": [64],
 }
 model = CatBoostClassifier(
     loss_function="MultiClass",
     cat_features=cat_cols,
     verbose=0,
-    early_stopping_rounds=20,
+    early_stopping_rounds=10,
     random_seed=42
 )
 search = RandomizedSearchCV(
@@ -172,8 +172,8 @@ with mlflow.start_run(run_name=run_name) as run:
     plt.savefig("ml/confusion_matrix.png")
     mlflow.log_artifact("ml/confusion_matrix.png")
 
-    explainer = shap.TreeExplainer(model)
-    shap.summary_plot(explainer.shap_values(X_test), X_test, show=False)
+    shap_values = shap.TreeExplainer(model).shap_values(X_test)
+    shap.summary_plot(shap_values, X_test, show=False)
     plt.savefig("ml/shap_summary.png")
     mlflow.log_artifact("ml/shap_summary.png")
 
