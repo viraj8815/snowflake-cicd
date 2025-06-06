@@ -98,7 +98,7 @@ cat_cols = X.select_dtypes(include=["object", "category"]).columns.tolist()
 model = CatBoostClassifier(
     depth=10,
     learning_rate=0.05,
-    iterations=1000,
+    iterations=500,
     l2_leaf_reg=3,
     border_count=64,
     loss_function="MultiClass",
