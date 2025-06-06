@@ -1,0 +1,15 @@
+artifact_uri: file:///C:/Users/HP/OneDrive/Documents/LOCAL/snowflake-cicd/mlruns/954548997810635865/4508d6fe939440aead8079a5c469e8f1/artifacts
+end_time: 1749167743103
+entry_point_name: ''
+experiment_id: '954548997810635865'
+lifecycle_stage: active
+run_id: 4508d6fe939440aead8079a5c469e8f1
+run_name: catboost_binary_lowhigh_v1
+run_uuid: 4508d6fe939440aead8079a5c469e8f1
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1749167715500
+status: 3
+tags: []
+user_id: runner
