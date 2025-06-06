@@ -50,7 +50,7 @@ jobs:
           pip install -r ml/requirements.txt
 
       - name: Train model with Snowpark + MLflow
-        run: python ml/train_model.py
+        run: python ml/train_model_c.py
 
       - name: Upload model and deploy UDF
         run: python ml/upload_model.py
