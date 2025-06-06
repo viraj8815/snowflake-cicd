@@ -3,20 +3,21 @@ import json
 import gzip
 import cloudpickle
 import mlflow
-import shap
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split, RandomizedSearchCV
+from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, f1_score, ConfusionMatrixDisplay
 from sklearn.preprocessing import LabelEncoder
 from mlflow.tracking import MlflowClient
 from mlflow.models.signature import infer_signature
 from snowflake.snowpark import Session
 from snowflake.snowpark.functions import when
+from xgboost import XGBClassifier
 
+# -----------------------------
 # Snowflake connection
+# -----------------------------
 connection_parameters = {
     "account": os.environ["SNOWFLAKE_ACCOUNT"],
     "user": os.environ["SNOWFLAKE_USER"],
@@ -26,14 +27,15 @@ connection_parameters = {
 }
 session = Session.builder.configs(connection_parameters).create()
 
-# Load 5 tables from TPCDS
+# -----------------------------
+# Load 5 tables and join
+# -----------------------------
 customer = session.table("TPCDS_10TB.TPCDS_SF10TCL.CUSTOMER")
 cdemo = session.table("TPCDS_10TB.TPCDS_SF10TCL.CUSTOMER_DEMOGRAPHICS")
 ddim = session.table("TPCDS_10TB.TPCDS_SF10TCL.DATE_DIM")
 csales = session.table("TPCDS_10TB.TPCDS_SF10TCL.CATALOG_SALES").limit(10000)
 item = session.table("TPCDS_10TB.TPCDS_SF10TCL.ITEM")
 
-# Join tables
 joined = (
     csales
     .join(customer, csales["CS_BILL_CUSTOMER_SK"] == customer["C_CUSTOMER_SK"])
@@ -54,7 +56,9 @@ pdf = joined.to_pandas()
 session.close()
 pdf.dropna(inplace=True)
 
-# Target creation
+# -----------------------------
+# Target: High Spender Classification
+# -----------------------------
 pdf["TOTAL_SPENT"] = pdf["CS_SALES_PRICE"] * pdf["CS_QUANTITY"]
 pdf["SPENDER_CLASS"] = pd.qcut(pdf["TOTAL_SPENT"], q=[0, 0.33, 0.66, 1.0], labels=["Low", "Medium", "High"])
 
@@ -64,41 +68,45 @@ pdf["HAS_COLLEGE_DEP"] = (pdf["CD_DEP_COLLEGE_COUNT"] > 0).astype(int)
 pdf["TOTAL_DEP"] = pdf["CD_DEP_COUNT"] + pdf["CD_DEP_EMPLOYED_COUNT"] + pdf["CD_DEP_COLLEGE_COUNT"]
 pdf["AGE_BIN"] = pd.cut(pdf["AGE"], bins=[0, 18, 30, 45, 60, 100], labels=["0", "1", "2", "3", "4"]).astype(str)
 
-# Prepare features and target
-X = pd.get_dummies(pdf.drop(columns=["TOTAL_SPENT", "SPENDER_CLASS"]))
+X = pdf.drop(columns=["TOTAL_SPENT", "SPENDER_CLASS"])
 y = pdf["SPENDER_CLASS"]
+
 label_encoder = LabelEncoder()
 y_encoded = label_encoder.fit_transform(y)
+
 X_train, X_test, y_train, y_test = train_test_split(X, y_encoded, stratify=y_encoded, random_state=42)
 
-# Random Forest + Search
-param_grid = {
-    "n_estimators": [200, 300, 400],
-    "max_depth": [20, 30, None],
-    "min_samples_split": [2, 5, 10],
-    "min_samples_leaf": [1, 2, 4],
-    "max_features": ["sqrt", "log2"],
-    "class_weight": ["balanced"]
-}
-search = RandomizedSearchCV(
-    estimator=RandomForestClassifier(random_state=42),
-    param_distributions=param_grid,
-    n_iter=10,
-    scoring="accuracy",
-    cv=3,
-    verbose=2,
-    n_jobs=-1
+# -----------------------------
+# Train XGBoost
+# -----------------------------
+model = XGBClassifier(
+    n_estimators=1000,
+    max_depth=6,
+    learning_rate=0.03,
+    objective="multi:softmax",
+    num_class=3,
+    eval_metric="mlogloss",
+    use_label_encoder=False,
+    early_stopping_rounds=20,
+    random_state=42
 )
-search.fit(X_train, y_train)
-model = search.best_estimator_
+model.fit(
+    X_train, y_train,
+    eval_set=[(X_test, y_test)],
+    verbose=True
+)
 
-# Evaluate
+# -----------------------------
+# Evaluation
+# -----------------------------
 y_pred = model.predict(X_test)
 accuracy = accuracy_score(y_test, y_pred)
 f1 = f1_score(y_test, y_pred, average="macro")
 print(f"✅ Accuracy: {accuracy:.4f}, F1 Score: {f1:.4f}")
 
+# -----------------------------
 # Save artifacts
+# -----------------------------
 os.makedirs("ml", exist_ok=True)
 with gzip.open("ml/model.pkl.gz", "wb") as f:
     cloudpickle.dump(model, f)
@@ -114,13 +122,15 @@ with open("ml/signature.json", "w") as f:
 with open("ml/drift_baseline.json", "w") as f:
     json.dump(pdf.describe(include="all").to_dict(), f, indent=2)
 
+# -----------------------------
 # Log to MLflow
-experiment_name = "snowflake-high-spender-rf"
+# -----------------------------
+experiment_name = "snowflake-high-spender-xgb"
 mlflow.set_experiment(experiment_name)
 client = MlflowClient()
 experiment = client.get_experiment_by_name(experiment_name)
 version_number = len(client.search_runs(experiment.experiment_id)) + 1
-run_name = f"rf_highspender_v{version_number}"
+run_name = f"xgboost_highspender_v{version_number}"
 
 with mlflow.start_run(run_name=run_name) as run:
     mlflow.set_tag("model_version", run_name)
