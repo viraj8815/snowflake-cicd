@@ -3,11 +3,10 @@ import json
 import gzip
 import cloudpickle
 import mlflow
-import shap
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
-from sklearn.model_selection import train_test_split, RandomizedSearchCV
+from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, f1_score, ConfusionMatrixDisplay
 from sklearn.preprocessing import LabelEncoder
 from mlflow.tracking import MlflowClient
@@ -94,34 +93,21 @@ X_train, X_test, y_train, y_test = train_test_split(X, y_encoded, stratify=y_enc
 cat_cols = X.select_dtypes(include=["object", "category"]).columns.tolist()
 
 # -----------------------------
-# Hyperparameter tuning
+# Train the model (1 time only)
 # -----------------------------
-param_grid = {
-    "depth": [10],
-    "learning_rate": [0.05],
-    "iterations": [1000],
-    "l2_leaf_reg": [3],
-    "border_count": [64],
-}
 model = CatBoostClassifier(
+    depth=10,
+    learning_rate=0.05,
+    iterations=1000,
+    l2_leaf_reg=3,
+    border_count=64,
     loss_function="MultiClass",
     cat_features=cat_cols,
-    verbose=0,
-    early_stopping_rounds=10,
+    verbose=100,
+    early_stopping_rounds=20,
     random_seed=42
 )
-search = RandomizedSearchCV(
-    estimator=model,
-    param_distributions=param_grid,
-    n_iter=30,
-    scoring="accuracy",
-    cv=3,
-    verbose=2,
-    n_jobs=-1
-)
-search.fit(X_train, y_train)
-model = search.best_estimator_
-print("✅ Best Params:", search.best_params_)
+model.fit(X_train, y_train, eval_set=(X_test, y_test))
 
 # -----------------------------
 # Evaluation
@@ -172,11 +158,6 @@ with mlflow.start_run(run_name=run_name) as run:
     plt.savefig("ml/confusion_matrix.png")
     mlflow.log_artifact("ml/confusion_matrix.png")
 
-   # shap_values = shap.TreeExplainer(model).shap_values(X_test)
-   # shap.summary_plot(shap_values, X_test, show=False)
-   # plt.savefig("ml/shap_summary.png")
-   # mlflow.log_artifact("ml/shap_summary.png")
-    
     signature = infer_signature(X_train, model.predict(X_train))
     input_example = X.head(5)
     mlflow.sklearn.log_model(model, "model", input_example=input_example, signature=signature)
