@@ -172,12 +172,10 @@ with mlflow.start_run(run_name=run_name) as run:
     plt.savefig("ml/confusion_matrix.png")
     mlflow.log_artifact("ml/confusion_matrix.png")
 
-    explainer = shap.TreeExplainer(model)
-    shap_values = explainer.shap_values(X_test)
-    shap.summary_plot(shap_values, X_test, show=False)
-    plt.savefig("ml/shap_summary.png")
-    mlflow.log_artifact("ml/shap_summary.png")
-    plt.close()
+   # shap_values = shap.TreeExplainer(model).shap_values(X_test)
+   # shap.summary_plot(shap_values, X_test, show=False)
+   # plt.savefig("ml/shap_summary.png")
+   # mlflow.log_artifact("ml/shap_summary.png")
     
     signature = infer_signature(X_train, model.predict(X_train))
     input_example = X.head(5)
