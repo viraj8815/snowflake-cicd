@@ -74,6 +74,10 @@ y = pdf["SPENDER_CLASS"]
 label_encoder = LabelEncoder()
 y_encoded = label_encoder.fit_transform(y)
 
+# Convert object columns to categorical
+for col in X.select_dtypes(include="object").columns:
+    X[col] = X[col].astype("category")
+
 X_train, X_test, y_train, y_test = train_test_split(X, y_encoded, stratify=y_encoded, random_state=42)
 
 # -----------------------------
@@ -86,8 +90,7 @@ model = XGBClassifier(
     objective="multi:softmax",
     num_class=3,
     eval_metric="mlogloss",
-    use_label_encoder=False,
-    early_stopping_rounds=20,
+    enable_categorical=True,
     random_state=42
 )
 model.fit(
