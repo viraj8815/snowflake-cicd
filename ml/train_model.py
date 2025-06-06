@@ -51,7 +51,7 @@ joined = (
         "CD_DEP_COUNT", "CD_DEP_EMPLOYED_COUNT", "CD_DEP_COLLEGE_COUNT",
         (2025 - customer["C_BIRTH_YEAR"]).alias("AGE"),
         when(ddim["D_DAY_NAME"].isin(["Saturday", "Sunday"]), 1).otherwise(0).alias("IS_WEEKEND"),
-        "EXT_LIST_PRICE", "WHOLESALE_COST", "SALES_PRICE", "QUANTITY",
+        "CS_EXT_LIST_PRICE", "CS_WHOLESALE_COST", "CS_SALES_PRICE", "CS_QUANTITY",
         "I_CATEGORY", "I_CLASS"
     )
 )
@@ -66,7 +66,7 @@ pdf.dropna(inplace=True)
 # -----------------------------
 # Target creation
 # -----------------------------
-pdf["TOTAL_SPENT"] = pdf["SALES_PRICE"] * pdf["QUANTITY"]
+pdf["TOTAL_SPENT"] = pdf["CS_SALES_PRICE"] * pdf["CS_QUANTITY"]
 pdf["SPENDER_CLASS"] = pd.qcut(pdf["TOTAL_SPENT"], q=[0, 0.33, 0.66, 1.0], labels=["Low", "Medium", "High"])
 
 # -----------------------------
