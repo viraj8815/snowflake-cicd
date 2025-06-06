@@ -1,12 +1,13 @@
 import os
-import json
 import gzip
+import json
 import cloudpickle
 import mlflow
 import shap
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
+
 from sklearn.model_selection import train_test_split, RandomizedSearchCV
 from sklearn.metrics import accuracy_score, f1_score, ConfusionMatrixDisplay
 from sklearn.preprocessing import LabelEncoder
@@ -18,7 +19,7 @@ from catboost import CatBoostClassifier
 from mlflow.tracking import MlflowClient
 
 # -----------------------------
-# Snowflake connection
+# Snowflake Connection
 # -----------------------------
 connection_parameters = {
     "account": os.environ["SNOWFLAKE_ACCOUNT"],
@@ -30,33 +31,33 @@ connection_parameters = {
 session = Session.builder.configs(connection_parameters).create()
 
 # -----------------------------
-# Load and join 3 tables from Snowflake
+# Load and join 4 tables
 # -----------------------------
-cust = session.table("ML_DB.TRAINING_DATA.CUSTOMER_SAMPLE")
-demo = session.table("ML_DB.TRAINING_DATA.CUSTOMER_DEMOGRAPHICS_SAMPLE")
-date = session.table("ML_DB.TRAINING_DATA.DATE_DIM_SAMPLE")
+customer = session.table("TPCDS_10TB.TPCDS_SF10TCL.CUSTOMER")
+cdemo = session.table("TPCDS_10TB.TPCDS_SF10TCL.CUSTOMER_DEMOGRAPHICS")
+ddim = session.table("TPCDS_10TB.TPCDS_SF10TCL.DATE_DIM")
+csales = session.table("TPCDS_10TB.TPCDS_SF10TCL.CATALOG_SALES").limit(10000)
 
 df = (
-    cust.join(demo, cust["C_CURRENT_CDEMO_SK"] == demo["CD_DEMO_SK"])
-        .join(date, cust["C_FIRST_SALES_DATE_SK"] == date["D_DATE_SK"])
-        .with_column("AGE", 2025 - cust["C_BIRTH_YEAR"])
-        .with_column("IS_WEEKEND", when(date["D_DAY_NAME"].isin(["Saturday", "Sunday"]), 1).otherwise(0))
-        .select(
-            "CD_GENDER",
-            "CD_MARITAL_STATUS",
-            "CD_EDUCATION_STATUS",
-            "CD_CREDIT_RATING",
-            "CD_DEP_COUNT",
-            "CD_DEP_EMPLOYED_COUNT",
-            "CD_DEP_COLLEGE_COUNT",
-            "AGE",
-            "IS_WEEKEND",
-            "CD_PURCHASE_ESTIMATE"
-        )
+    csales.join(customer, csales["CS_BILL_CUSTOMER_SK"] == customer["C_CUSTOMER_SK"])
+          .join(cdemo, customer["C_CURRENT_CDEMO_SK"] == cdemo["CD_DEMO_SK"])
+          .join(ddim, csales["CS_SOLD_DATE_SK"] == ddim["D_DATE_SK"])
+          .select(
+              "CD_GENDER",
+              "CD_MARITAL_STATUS",
+              "CD_EDUCATION_STATUS",
+              "CD_CREDIT_RATING",
+              "CD_DEP_COUNT",
+              "CD_DEP_EMPLOYED_COUNT",
+              "CD_DEP_COLLEGE_COUNT",
+              (2025 - customer["C_BIRTH_YEAR"]).alias("AGE"),
+              when(ddim["D_DAY_NAME"].isin(["Saturday", "Sunday"]), 1).otherwise(0).alias("IS_WEEKEND"),
+              csales["CS_NET_PAID"].alias("TOTAL_SPENT")
+          )
 )
 
 # -----------------------------
-# Convert to Pandas and clean
+# Convert to Pandas
 # -----------------------------
 pdf = df.to_pandas()
 pdf.dropna(inplace=True)
@@ -66,70 +67,62 @@ pdf.dropna(inplace=True)
 # -----------------------------
 pdf["IS_MARRIED"] = pdf["CD_MARITAL_STATUS"].isin(["M", "D"]).astype(int)
 pdf["HAS_COLLEGE_DEP"] = (pdf["CD_DEP_COLLEGE_COUNT"] > 0).astype(int)
-pdf["TOTAL_DEP"] = pdf["CD_DEP_COUNT"] + pdf["CD_DEP_EMPLOYED_COUNT"] + pdf["CD_DEP_COLLEGE_COUNT"]
-pdf["AGE_BIN"] = pd.cut(pdf["AGE"], bins=[0, 18, 30, 45, 60, 100], labels=["0", "1", "2", "3", "4"]).astype(str)
-pdf["EMPLOYED_DEP_RATIO"] = (
-    pdf["CD_DEP_EMPLOYED_COUNT"] / pdf["CD_DEP_COUNT"].replace(0, np.nan)
-).fillna(0)
-
-# -----------------------------
-# Binary Classification: Low vs High
-# -----------------------------
-q1 = pdf["CD_PURCHASE_ESTIMATE"].quantile(1/3)
-q3 = pdf["CD_PURCHASE_ESTIMATE"].quantile(2/3)
-
-pdf = pdf[(pdf["CD_PURCHASE_ESTIMATE"] <= q1) | (pdf["CD_PURCHASE_ESTIMATE"] >= q3)].copy()
-pdf["PURCHASE_RANGE"] = pd.cut(
-    pdf["CD_PURCHASE_ESTIMATE"],
-    bins=[-float("inf"), q1, float("inf")],
-    labels=["Low", "High"]
+pdf["TOTAL_DEP"] = (
+    pdf["CD_DEP_COUNT"] +
+    pdf["CD_DEP_EMPLOYED_COUNT"] +
+    pdf["CD_DEP_COLLEGE_COUNT"]
 )
-
-X = pdf.drop(columns=["CD_PURCHASE_ESTIMATE", "PURCHASE_RANGE"])
-y = pdf["PURCHASE_RANGE"]
+pdf["AGE_BIN"] = pd.cut(pdf["AGE"], bins=[0, 18, 30, 45, 60, 100], labels=["0", "1", "2", "3", "4"]).astype(str)
 
 # -----------------------------
-# Encode target
+# Binarize High Spender
 # -----------------------------
-label_encoder = LabelEncoder()
-y_encoded = label_encoder.fit_transform(y)
+q2 = pdf["TOTAL_SPENT"].quantile(0.66)
+pdf["HIGH_SPENDER"] = (pdf["TOTAL_SPENT"] >= q2).astype(int)
+
+X = pdf.drop(columns=["TOTAL_SPENT", "HIGH_SPENDER"])
+y = pdf["HIGH_SPENDER"]
+
+# -----------------------------
+# Encode categorical
+# -----------------------------
+cat_cols = X.select_dtypes(include="object").columns.tolist()
+X = pd.get_dummies(X, columns=cat_cols)
 
 # -----------------------------
 # Train-Test Split
 # -----------------------------
-X_train, X_test, y_train, y_test = train_test_split(X, y_encoded, stratify=y_encoded, random_state=42)
-cat_cols = X.select_dtypes(include=["object", "category"]).columns.tolist()
+X_train, X_test, y_train, y_test = train_test_split(X, y, stratify=y, random_state=42)
 
 # -----------------------------
 # Compute class weights
 # -----------------------------
-class_weights_arr = compute_class_weight("balanced", classes=np.unique(y_train), y=y_train)
-class_weights = {i: w for i, w in enumerate(class_weights_arr)}
+weights = compute_class_weight("balanced", classes=np.unique(y_train), y=y_train)
+class_weights = {i: w for i, w in enumerate(weights)}
 
 # -----------------------------
-# Hyperparameter Search
+# Hyperparameter Tuning
 # -----------------------------
 param_grid = {
-    "depth": [12],
-    "learning_rate": [0.01],
-    "iterations": [500],
-    "l2_leaf_reg": [1],
-    "border_count": [64],
+    "depth": [6, 8, 10],
+    "learning_rate": [0.01, 0.03, 0.05],
+    "iterations": [500, 1000],
+    "l2_leaf_reg": [1, 3, 5],
+    "border_count": [32, 64],
 }
 
 base_model = CatBoostClassifier(
     loss_function="Logloss",
-    cat_features=cat_cols,
-    early_stopping_rounds=5,
+    early_stopping_rounds=20,
     class_weights=class_weights,
-    verbose=0,
-    random_seed=42
+    random_seed=42,
+    verbose=0
 )
 
 search = RandomizedSearchCV(
     estimator=base_model,
     param_distributions=param_grid,
-    n_iter=1,
+    n_iter=30,
     scoring="accuracy",
     cv=3,
     verbose=2,
@@ -141,11 +134,11 @@ model = search.best_estimator_
 print("✅ Best Params:", search.best_params_)
 
 # -----------------------------
-# Evaluate
+# Evaluation
 # -----------------------------
 y_pred = model.predict(X_test)
 accuracy = accuracy_score(y_test, y_pred)
-f1 = f1_score(y_test, y_pred, average="macro")
+f1 = f1_score(y_test, y_pred)
 print(f"✅ Accuracy: {accuracy:.4f}, F1: {f1:.4f}")
 
 # -----------------------------
@@ -154,8 +147,6 @@ print(f"✅ Accuracy: {accuracy:.4f}, F1: {f1:.4f}")
 os.makedirs("ml", exist_ok=True)
 pipeline = {
     "model": model,
-    "cat_features": cat_cols,
-    "label_encoder": label_encoder,
     "feature_order": list(X.columns)
 }
 with gzip.open("ml/model.pkl.gz", "wb") as f:
@@ -167,7 +158,7 @@ with open("ml/metrics.json", "w") as f:
 with open("ml/signature.json", "w") as f:
     json.dump({
         "inputs": list(X.columns),
-        "output": "PURCHASE_RANGE",
+        "output": "HIGH_SPENDER",
         "model_type": model.__class__.__name__,
         "hyperparams": model.get_params()
     }, f, indent=2)
@@ -176,43 +167,44 @@ with open("ml/drift_baseline.json", "w") as f:
     json.dump(pdf.describe(include='all').to_dict(), f, indent=2)
 
 # -----------------------------
-# Log to MLflow (as requested)
+# MLflow Logging
 # -----------------------------
-experiment_name = "snowflake-ml-model"
+experiment_name = "snowflake-high-spender-predictor"
 mlflow.set_experiment(experiment_name)
 
 client = MlflowClient()
 experiment = client.get_experiment_by_name(experiment_name)
-existing_runs = mlflow.search_runs(experiment.experiment_id)
+existing_runs = client.search_runs(experiment.experiment_id)
 version_number = len(existing_runs) + 1
-run_name = f"rf_model_v{version_number}"
+run_name = f"high_spender_v{version_number}"
 
-with mlflow.start_run(run_name=run_name) as run:
-    mlflow.set_tag("dataset_version", f"v{version_number}")
+with mlflow.start_run(run_name=run_name):
     mlflow.set_tag("model_version", run_name)
-
     mlflow.log_params(model.get_params())
-    mlflow.log_metric("accuracy", accuracy)
+    mlflow.log_metrics({"accuracy": accuracy, "f1_score": f1})
 
     ConfusionMatrixDisplay.from_predictions(y_test, y_pred)
     plt.title("Confusion Matrix")
     plt.savefig("ml/confusion_matrix.png")
     mlflow.log_artifact("ml/confusion_matrix.png")
 
-    explainer = shap.TreeExplainer(model)
-    shap.summary_plot(explainer.shap_values(X_test), X_test, show=False)
+    shap_values = shap.TreeExplainer(model).shap_values(X_test)
+    shap.summary_plot(shap_values, X_test, show=False)
     plt.savefig("ml/shap_summary.png")
     mlflow.log_artifact("ml/shap_summary.png")
 
     signature = infer_signature(X_train, model.predict(X_train))
     input_example = X.head(5)
-    mlflow.sklearn.log_model(model, artifact_path="model", input_example=input_example, signature=signature)
+    mlflow.sklearn.log_model(
+        model,
+        artifact_path="model",
+        input_example=input_example,
+        signature=signature
+    )
 
     mlflow.log_artifact("ml/model.pkl.gz")
     mlflow.log_artifact("ml/metrics.json")
     mlflow.log_artifact("ml/signature.json")
     mlflow.log_artifact("ml/drift_baseline.json")
 
-print(f"✅ Final Binary Accuracy: {accuracy:.4f}, F1 Score: {f1:.4f}, Version: {version_number}")
-
-
+print(f"✅ Final Accuracy: {accuracy:.4f}, F1 Score: {f1:.4f}, Version: {version_number}")
