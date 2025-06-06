@@ -91,6 +91,7 @@ model = XGBClassifier(
     num_class=3,
     eval_metric="mlogloss",
     enable_categorical=True,
+    tree_method="hist",  # ✅ Required for categorical support
     random_state=42
 )
 model.fit(
