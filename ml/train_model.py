@@ -100,7 +100,7 @@ param_grid = {
     "depth": [10],
     "learning_rate": [0.05],
     "iterations": [1000],
-    "l2_leaf_reg": [1],
+    "l2_leaf_reg": [3],
     "border_count": [64],
 }
 model = CatBoostClassifier(
@@ -172,11 +172,11 @@ with mlflow.start_run(run_name=run_name) as run:
     plt.savefig("ml/confusion_matrix.png")
     mlflow.log_artifact("ml/confusion_matrix.png")
 
-    shap_values = shap.TreeExplainer(model).shap_values(X_test)
-    shap.summary_plot(shap_values, X_test, show=False)
-    plt.savefig("ml/shap_summary.png")
-    mlflow.log_artifact("ml/shap_summary.png")
-
+   # shap_values = shap.TreeExplainer(model).shap_values(X_test)
+   # shap.summary_plot(shap_values, X_test, show=False)
+   # plt.savefig("ml/shap_summary.png")
+   # mlflow.log_artifact("ml/shap_summary.png")
+    
     signature = infer_signature(X_train, model.predict(X_train))
     input_example = X.head(5)
     mlflow.sklearn.log_model(model, "model", input_example=input_example, signature=signature)
