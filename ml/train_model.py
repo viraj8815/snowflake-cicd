@@ -14,6 +14,7 @@ from mlflow.models.signature import infer_signature
 from snowflake.snowpark import Session
 from snowflake.snowpark.functions import when
 from catboost import CatBoostClassifier
+from sklearn.ensemble import RandomForestClassifier
 
 # -----------------------------
 # Snowflake connection
