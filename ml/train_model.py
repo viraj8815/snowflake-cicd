@@ -95,18 +95,13 @@ cat_cols = X.select_dtypes(include=["object", "category"]).columns.tolist()
 # -----------------------------
 # Train the model (1 time only)
 # -----------------------------
-model = CatBoostClassifier(
-    depth=10,
-    learning_rate=0.05,
-    iterations=500,
-    l2_leaf_reg=3,
-    border_count=64,
-    loss_function="MultiClass",
-    cat_features=cat_cols,
-    verbose=100,
-    early_stopping_rounds=20,
-    random_seed=42
+model = RandomForestClassifier(
+    n_estimators=200,
+    max_depth=25,
+    class_weight="balanced",
+    random_state=42
 )
+
 model.fit(X_train, y_train, eval_set=(X_test, y_test))
 
 # -----------------------------
