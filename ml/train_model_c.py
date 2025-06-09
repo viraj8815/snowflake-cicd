@@ -30,11 +30,11 @@ session = Session.builder.configs(connection_parameters).create()
 # -----------------------------
 # Load 5 tables from TPCDS
 # -----------------------------
-customer = session.table("TPCDS_10TB.TPCDS_SF10TCL.CUSTOMER")
-cdemo = session.table("TPCDS_10TB.TPCDS_SF10TCL.CUSTOMER_DEMOGRAPHICS")
-ddim = session.table("TPCDS_10TB.TPCDS_SF10TCL.DATE_DIM")
-csales = session.table("TPCDS_10TB.TPCDS_SF10TCL.CATALOG_SALES").limit(10000)
-item = session.table("TPCDS_10TB.TPCDS_SF10TCL.ITEM")
+customer = session.table("ML_DB.TRAINING_DATA.CUSTOMER_SAMPLE")
+cdemo = session.table("ML_DB.TRAINING_DATA.CUSTOMER_DEMOGRAPHICS_SAMPLE")
+ddim = session.table("ML_DB.TRAINING_DATA.DATE_DIM_SAMPLE")
+csales = session.table("ML_DB.TRAINING_DATA.CATALOG_SALES_SAMPLE")
+item = session.table("ML_DB.TRAINING_DATA.ITEM_SAMPLE")
 
 # -----------------------------
 # Join tables using Snowpark
@@ -51,7 +51,7 @@ joined = (
         (2025 - customer["C_BIRTH_YEAR"]).alias("AGE"),
         when(ddim["D_DAY_NAME"].isin(["Saturday", "Sunday"]), 1).otherwise(0).alias("IS_WEEKEND"),
         "CS_EXT_LIST_PRICE", "CS_WHOLESALE_COST", "CS_SALES_PRICE", "CS_QUANTITY",
-        "I_CATEGORY", "I_CLASS"
+        "I_CATEGORY"
     )
 )
 
@@ -141,7 +141,7 @@ with open("ml/drift_baseline.json", "w") as f:
 # -----------------------------
 # Log to MLflow
 # -----------------------------
-experiment_name = "snowflake-high-spender-predictor"
+experiment_name = "snowflake-high-spender-rf"
 mlflow.set_experiment(experiment_name)
 client = MlflowClient()
 experiment = client.get_experiment_by_name(experiment_name)
