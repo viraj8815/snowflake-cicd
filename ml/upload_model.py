@@ -93,17 +93,27 @@ if accuracy > best_accuracy:
     # -----------------------------
     # Deploy champion model for UDF
     # -----------------------------
-    shutil.copyfile(versioned_model, "ml/model.pkl.gz")
-    cursor.execute("PUT file://ml/model.pkl.gz @ml_models_stage AUTO_COMPRESS=FALSE OVERWRITE=TRUE")
+   # shutil.copyfile(versioned_model, "ml/model.pkl.gz")
+   # cursor.execute("PUT file://ml/model.pkl.gz @ml_models_stage AUTO_COMPRESS=FALSE OVERWRITE=TRUE")
+   # UDF deployment uses versioned model directly
+    cursor.execute(f"PUT file://{versioned_model} @ml_models_stage AUTO_COMPRESS=FALSE OVERWRITE=TRUE")
+
 
     print("🔧 Creating or replacing Python UDF...")
     cursor.execute("""
 CREATE OR REPLACE FUNCTION infer_model(
-    CD_DEP_COUNT INT,
+     CD_DEP_COUNT INT,
     CD_DEP_EMPLOYED_COUNT INT,
     CD_DEP_COLLEGE_COUNT INT,
     AGE INT,
     IS_WEEKEND INT,
+    CS_EXT_LIST_PRICE FLOAT,
+    CS_WHOLESALE_COST FLOAT,
+    CS_SALES_PRICE FLOAT,
+    CS_QUANTITY INT,
+    IS_MARRIED INT,
+    HAS_COLLEGE_DEP INT,
+    TOTAL_DEP INT,
     CD_GENDER_F INT,
     CD_GENDER_M INT,
     CD_MARITAL_STATUS_D INT,
@@ -121,14 +131,28 @@ CREATE OR REPLACE FUNCTION infer_model(
     CD_CREDIT_RATING_Good INT,
     CD_CREDIT_RATING_High_Risk INT,
     CD_CREDIT_RATING_Low_Risk INT,
-    CD_CREDIT_RATING_Unknown INT
+    CD_CREDIT_RATING_Unknown INT,
+    I_CATEGORY_Books INT,
+    I_CATEGORY_Children INT,
+    I_CATEGORY_Electronics INT,
+    I_CATEGORY_Home INT,
+    I_CATEGORY_Jewelry INT,
+    I_CATEGORY_Men INT,
+    I_CATEGORY_Music INT,
+    I_CATEGORY_Shoes INT,
+    I_CATEGORY_Sports INT,
+    I_CATEGORY_Women INT,
+    AGE_BIN_2 INT,
+    AGE_BIN_3 INT,
+    AGE_BIN_4 INT,
+    AGE_BIN_nan INT
 )
 RETURNS STRING
 LANGUAGE PYTHON
 RUNTIME_VERSION = '3.10'
 HANDLER = 'predict'
 PACKAGES = ('scikit-learn', 'cloudpickle', 'numpy')
-IMPORTS = ('@ml_models_stage/model.pkl.gz')
+IMPORTS = ('@ml_models_stage/model_v{version}.pkl.gz')
 AS
 $$
 import cloudpickle, gzip, os, sys
