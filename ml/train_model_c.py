@@ -141,7 +141,7 @@ with open("ml/drift_baseline.json", "w") as f:
 # -----------------------------
 # Log to MLflow
 # -----------------------------
-experiment_name = "snowflake-high-spender-predictor"
+experiment_name = "snowflake-high-spender-rf"
 mlflow.set_experiment(experiment_name)
 client = MlflowClient()
 experiment = client.get_experiment_by_name(experiment_name)
@@ -168,4 +168,3 @@ with mlflow.start_run(run_name=run_name) as run:
     mlflow.log_artifact("ml/drift_baseline.json")
 
 print(f"✅ Final Accuracy: {accuracy:.4f}, F1 Score: {f1:.4f}, Version: {version_number}")
-
