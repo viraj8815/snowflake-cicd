@@ -164,7 +164,7 @@ with gzip.open(model_path, "rb") as f:
 def predict(*args):
     return model.predict([list(args)])[0]
 $$;
-    """)
+    """.replace("{version}", version))
     print("✅ UDF deployed with champion model.")
 else:
     print(f"⚠️ Skipping deployment: accuracy {accuracy:.4f} is not better than best {best_accuracy:.4f}")
