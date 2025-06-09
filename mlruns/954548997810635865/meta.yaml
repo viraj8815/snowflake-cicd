@@ -1,6 +1,0 @@
-artifact_location: file:///home/runner/work/snowflake-cicd/snowflake-cicd/mlruns/954548997810635865
-creation_time: 1749167715458
-experiment_id: '954548997810635865'
-last_update_time: 1749167715458
-lifecycle_stage: active
-name: snowflake-ml-binary-low-high
