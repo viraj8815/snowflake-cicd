@@ -1,0 +1,15 @@
+artifact_uri: file:///C:/Users/HP/OneDrive/Documents/LOCAL/snowflake-cicd/mlruns/456301690504398494/73c830467ef043c7b840af16023a8438/artifacts
+end_time: 1748982151538
+entry_point_name: ''
+experiment_id: '456301690504398494'
+lifecycle_stage: active
+run_id: 73c830467ef043c7b840af16023a8438
+run_name: carefree-boar-33
+run_uuid: 73c830467ef043c7b840af16023a8438
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1748982148364
+status: 3
+tags: []
+user_id: runner
