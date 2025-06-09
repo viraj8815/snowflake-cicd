@@ -30,11 +30,11 @@ session = Session.builder.configs(connection_parameters).create()
 # -----------------------------
 # Load 5 tables from TPCDS
 # -----------------------------
-customer = session.table("TPCDS_10TB.TPCDS_SF10TCL.CUSTOMER")
-cdemo = session.table("TPCDS_10TB.TPCDS_SF10TCL.CUSTOMER_DEMOGRAPHICS")
-ddim = session.table("TPCDS_10TB.TPCDS_SF10TCL.DATE_DIM")
-csales = session.table("TPCDS_10TB.TPCDS_SF10TCL.CATALOG_SALES").limit(10000)
-item = session.table("TPCDS_10TB.TPCDS_SF10TCL.ITEM")
+customer = session.table("ML_DB.TRAINING_DATA.CUSTOMER_SAMPLE")
+cdemo = session.table("ML_DB.TRAINING_DATA.CUSTOMER_DEMOGRAPHICS_SAMPLE")
+ddim = session.table("ML_DB.TRAINING_DATA.DATE_DIM_SAMPLE")
+csales = session.table("ML_DB.TRAINING_DATA.CATALOG_SALES_SAMPLE")
+item = session.table("ML_DB.TRAINING_DATA.ITEM_SAMPLE")
 
 # -----------------------------
 # Join tables using Snowpark
