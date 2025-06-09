@@ -1,0 +1,6 @@
+artifact_location: file:///home/runner/work/snowflake-cicd/snowflake-cicd/mlruns/400714627983789107
+creation_time: 1749211258532
+experiment_id: '400714627983789107'
+last_update_time: 1749211258532
+lifecycle_stage: active
+name: snowflake-high-spender-predictor

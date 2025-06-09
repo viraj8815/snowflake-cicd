@@ -9,3 +9,6 @@ snowflake-snowpark-python
 pyarrow<19.0.0
 shap
 matplotlib
+xgboost
+xgboost==1.7.6
+catboost

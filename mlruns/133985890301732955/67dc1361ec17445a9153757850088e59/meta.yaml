@@ -1,0 +1,15 @@
+artifact_uri: file:///C:/Users/HP/OneDrive/Documents/LOCAL/snowflake-cicd/mlruns/133985890301732955/67dc1361ec17445a9153757850088e59/artifacts
+end_time: 1749140187338
+entry_point_name: ''
+experiment_id: '133985890301732955'
+lifecycle_stage: active
+run_id: 67dc1361ec17445a9153757850088e59
+run_name: rf_model_v2
+run_uuid: 67dc1361ec17445a9153757850088e59
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1749140119605
+status: 3
+tags: []
+user_id: runner

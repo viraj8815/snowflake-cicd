@@ -1,6 +1,12 @@
 artifact_location: file:///home/runner/work/snowflake-cicd/snowflake-cicd/mlruns/0
+<<<<<<< HEAD
 creation_time: 1748977628344
 experiment_id: '0'
 last_update_time: 1748977628344
+=======
+creation_time: 1749138337970
+experiment_id: '0'
+last_update_time: 1749138337970
+>>>>>>> dev
 lifecycle_stage: active
 name: Default
