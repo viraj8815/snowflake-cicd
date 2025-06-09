@@ -165,7 +165,8 @@ label_mapping = {0: "Low", 1: "Medium", 2: "High"}
 
 def predict(*args):
     pred = model.predict([list(args)])[0]
-    return label_mapping.get(pred, "Unknown")
+    pred_class = int(pred[0])
+    return label_mapping.get(pred_class, "Unknown")
 $$;
     """.replace("{version}", version))
     print("✅ UDF deployed with champion model.")
