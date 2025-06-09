@@ -3,7 +3,7 @@ name: Snowflake CI Pipeline (STAGE - Auto Deploy + PR)
 on:
   push:
     branches:
-      - stage
+      - stag
 
 jobs:
   deploy-to-stage:
