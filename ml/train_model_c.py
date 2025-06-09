@@ -51,7 +51,7 @@ joined = (
         (2025 - customer["C_BIRTH_YEAR"]).alias("AGE"),
         when(ddim["D_DAY_NAME"].isin(["Saturday", "Sunday"]), 1).otherwise(0).alias("IS_WEEKEND"),
         "CS_EXT_LIST_PRICE", "CS_WHOLESALE_COST", "CS_SALES_PRICE", "CS_QUANTITY",
-        "I_CATEGORY", "I_CLASS"
+        "I_CATEGORY"
     )
 )
 
