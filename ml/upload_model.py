@@ -161,6 +161,8 @@ model_path = os.path.join(sys._xoptions["snowflake_import_directory"], "model_v{
 with gzip.open(model_path, "rb") as f:
     model = cloudpickle.load(f)
 
+label_mapping = {0: "Low", 1: "Medium", 2: "High"}
+
 def predict(*args):
     return model.predict([list(args)])[0]
 $$;
