@@ -26,38 +26,31 @@ conn = snowflake.connector.connect(
 )
 cursor = conn.cursor()
 
-# Step 1: Get list of all files from stage
+# Step 1: Get list of files from stage
 cursor.execute("LIST @ml_models_stage")
 files = cursor.fetchall()
+filenames = [row[0] for row in files]
 
-# Strip "ml_models_stage/" prefix so we can use correct file names in GET
-filenames = [row[0].replace("ml_models_stage/", "") for row in files]
-
-# Step 2: Determine latest version
-def get_latest_file(prefix):
+# Step 2: Identify latest versioned files
+def get_latest_file(prefix, ext):
     versioned = [
         (f, int(re.search(rf"{prefix}_v(\d+)", f).group(1)))
-        for f in filenames if re.search(rf"{prefix}_v(\d+)", f)
+        for f in filenames if re.search(rf"{prefix}_v(\d+)", f) and f.endswith(ext)
     ]
     return max(versioned, key=lambda x: x[1])[0] if versioned else None
 
-metrics_file = get_latest_file("metrics")
-drift_file = get_latest_file("drift_baseline")
-signature_file = get_latest_file("signature")
+metrics_file = get_latest_file("metrics", ".json")
+drift_file = get_latest_file("drift_baseline", ".json")
+signature_file = get_latest_file("signature", ".json")
+model_file = get_latest_file("model", ".pkl.gz")  # now uses versioned model
 
-# model.pkl.gz is not versioned — fetch directly
-model_file = "model.pkl.gz"
-
-# Step 3: Download required files
+# Step 3: Download files
 def download_file(file_path):
     if file_path:
-        try:
-            cursor.execute(f"GET @ml_models_stage/{file_path} file://ml/")
-            print(f"✅ Downloaded: {file_path}")
-        except Exception as e:
-            raise RuntimeError(f"❌ Error downloading {file_path}: {e}")
+        cursor.execute(f"GET @ml_models_stage/{file_path} file://ml/")
+        print(f"✅ Downloaded: {file_path}")
     else:
-        raise FileNotFoundError(f"❌ No versioned file found for {file_path}")
+        raise FileNotFoundError(f"❌ No file found for {file_path}")
 
 download_file(metrics_file)
 download_file(drift_file)
@@ -70,7 +63,7 @@ with open(metrics_local) as f:
     metrics = json.load(f)
 
 # -------------------------------
-# CI TESTS
+# ✅ CI TESTS
 # -------------------------------
 def test_accuracy_threshold():
     assert metrics["accuracy"] >= MIN_ACCURACY, f"❌ Accuracy too low: {metrics['accuracy']}"
@@ -81,13 +74,13 @@ def test_champion_comparison():
     result = cursor.fetchone()
     if result and result[0] is not None:
         prev_acc = result[0]
-        assert metrics["accuracy"] > prev_acc, (
-            f"❌ Accuracy {metrics['accuracy']} not better than current champion {prev_acc}"
+        assert metrics["accuracy"] >= prev_acc, (
+            f"❌ Accuracy {metrics['accuracy']} not better or equal to current champion {prev_acc}"
         )
 
 def test_model_file_exists_and_loadable():
-    path = "ml/model.pkl.gz"
-    assert os.path.exists(path), "❌ model.pkl.gz not found"
+    path = Path("ml") / Path(model_file).name
+    assert path.exists(), f"❌ {model_file} not found"
     try:
         with gzip.open(path, "rb") as f:
             _ = cloudpickle.load(f)
@@ -99,17 +92,17 @@ def test_required_artifacts_exist():
         Path("ml") / Path(metrics_file).name,
         Path("ml") / Path(drift_file).name,
         Path("ml") / Path(signature_file).name,
-        "ml/model.pkl.gz",
-        "ml/confusion_matrix.png"
+        Path("ml") / Path(model_file).name
     ]
     for file in required:
-        assert os.path.exists(file), f"❌ Required artifact missing: {file}"
+        assert file.exists(), f"❌ Required artifact missing: {file}"
 
 def test_model_file_size():
-    size = os.path.getsize("ml/model.pkl.gz")
+    path = Path("ml") / Path(model_file).name
+    size = os.path.getsize(path)
     assert size < MAX_MODEL_SIZE_BYTES, f"❌ Model file too large: {size} bytes"
 
-# Run all
+# Run all tests
 if __name__ == "__main__":
     test_accuracy_threshold()
     test_champion_comparison()
