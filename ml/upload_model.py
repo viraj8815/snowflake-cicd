@@ -157,7 +157,7 @@ AS
 $$
 import cloudpickle, gzip, os, sys
 
-model_path = os.path.join(sys._xoptions["snowflake_import_directory"], "model.pkl.gz")
+model_path = os.path.join(sys._xoptions["snowflake_import_directory"], "model_v{version}.pkl.gz")
 with gzip.open(model_path, "rb") as f:
     model = cloudpickle.load(f)
 
