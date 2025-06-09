@@ -2,7 +2,7 @@ name: MLOps - Train & Upload Model to Snowflake
 
 on:
   push:
-    branches: [stage, main]
+    branches: [stag, mai]
 
 jobs:
   mlops:
