@@ -1,44 +1,75 @@
 import os
+import re
 import json
 import gzip
 import cloudpickle
 import snowflake.connector
+from pathlib import Path
 
-# Load metrics from saved file
-with open("ml/metrics.json") as f:
-    metrics = json.load(f)
-
-# Accuracy and F1 thresholds
+# Constants
 MIN_ACCURACY = 0.85
 MIN_F1 = 0.80
-
-# Required artifacts
-required_files = [
-    "ml/model.pkl.gz",
-    "ml/metrics.json",
-    "ml/signature.json",
-    "ml/drift_baseline.json",
-    "ml/confusion_matrix.png"
-]
-
-# File size threshold (100MB)
 MAX_MODEL_SIZE_BYTES = 100 * 1024 * 1024
 
+# Ensure local ml/ directory exists
+Path("ml").mkdir(exist_ok=True)
+
+# Connect to Snowflake
+conn = snowflake.connector.connect(
+    user=os.environ["SNOWFLAKE_USER"],
+    password=os.environ["SNOWFLAKE_PASSWORD"],
+    account=os.environ["SNOWFLAKE_ACCOUNT"],
+    role=os.environ["SNOWFLAKE_ROLE"],
+    warehouse=os.environ["SNOWFLAKE_WAREHOUSE"],
+    database=os.environ["SNOWFLAKE_DATABASE"],
+    schema=os.environ["SNOWFLAKE_SCHEMA"]
+)
+cursor = conn.cursor()
+
+# Step 1: Get list of all files from Snowflake stage
+cursor.execute("LIST @ml_models_stage")
+files = cursor.fetchall()
+filenames = [row[0] for row in files]
+
+# Step 2: Determine latest versioned files
+def get_latest_file(prefix):
+    versioned = [
+        (f, int(re.search(rf"{prefix}_v(\d+)", f).group(1)))
+        for f in filenames if re.search(rf"{prefix}_v(\d+)", f)
+    ]
+    return max(versioned, key=lambda x: x[1])[0] if versioned else None
+
+metrics_file = get_latest_file("metrics")
+drift_file = get_latest_file("drift_baseline")
+signature_file = get_latest_file("signature")
+model_file = get_latest_file("model")  
+
+# Step 3: Download all files from Snowflake stage
+def download_file(file_path):
+    if file_path:
+        cursor.execute(f"GET @ml_models_stage/{file_path} file://ml/")
+        print(f"✅ Downloaded: {file_path}")
+    else:
+        raise FileNotFoundError(f"❌ No versioned file found for: {file_path}")
+
+download_file(metrics_file)
+download_file(drift_file)
+download_file(signature_file)
+download_file(model_file)
+
+# Step 4: Load metrics
+metrics_local = Path("ml") / Path(metrics_file).name
+with open(metrics_local) as f:
+    metrics = json.load(f)
+
+# ---------------------------------------
+# CI TESTS
+# ---------------------------------------
 def test_accuracy_threshold():
     assert metrics["accuracy"] >= MIN_ACCURACY, f"❌ Accuracy too low: {metrics['accuracy']}"
     assert metrics["f1_score"] >= MIN_F1, f"❌ F1 score too low: {metrics['f1_score']}"
 
 def test_champion_comparison():
-    conn = snowflake.connector.connect(
-        user=os.environ["SNOWFLAKE_USER"],
-        password=os.environ["SNOWFLAKE_PASSWORD"],
-        account=os.environ["SNOWFLAKE_ACCOUNT"],
-        role=os.environ["SNOWFLAKE_ROLE"],
-        warehouse=os.environ["SNOWFLAKE_WAREHOUSE"],
-        database=os.environ["SNOWFLAKE_DATABASE"],
-        schema=os.environ["SNOWFLAKE_SCHEMA"]
-    )
-    cursor = conn.cursor()
     cursor.execute("SELECT MAX(ACCURACY) FROM MODEL_HISTORY WHERE IS_CHAMPION = TRUE")
     result = cursor.fetchone()
     if result and result[0] is not None:
@@ -46,23 +77,28 @@ def test_champion_comparison():
         assert metrics["accuracy"] > prev_acc, (
             f"❌ Accuracy {metrics['accuracy']} not better than current champion {prev_acc}"
         )
-    cursor.close()
-    conn.close()
 
 def test_model_file_exists_and_loadable():
-    assert os.path.exists("ml/model.pkl.gz"), "❌ model.pkl.gz not found"
+    path = Path("ml") / Path(model_file).name
+    assert os.path.exists(path), f"❌ {path} not found"
     try:
-        with gzip.open("ml/model.pkl.gz", "rb") as f:
+        with gzip.open(path, "rb") as f:
             _ = cloudpickle.load(f)
     except Exception as e:
         raise AssertionError(f"❌ Failed to load model file: {e}")
 
 def test_required_artifacts_exist():
-    for file in required_files:
+    required = [
+        Path("ml") / Path(metrics_file).name,
+        Path("ml") / Path(drift_file).name,
+        Path("ml") / Path(signature_file).name,
+        Path("ml") / Path(model_file).name,
+    ]
+    for file in required:
         assert os.path.exists(file), f"❌ Required artifact missing: {file}"
 
 def test_model_file_size():
-    size = os.path.getsize("ml/model.pkl.gz")
+    size = os.path.getsize(Path("ml") / Path(model_file).name)
     assert size < MAX_MODEL_SIZE_BYTES, f"❌ Model file too large: {size} bytes"
 
 # Run all tests
