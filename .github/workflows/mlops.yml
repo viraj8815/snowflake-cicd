@@ -1,97 +1,55 @@
-name: Snowflake MLOps CI/CD
+name: MLOps Pipeline
 
 on:
   push:
-    branches: [ dev, stage, main ]
-  pull_request:
-    branches: [ stage, main ]
-
-env:
-  SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-  SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
-  SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
-  SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
-  SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
-  SNOWFLAKE_DATABASE: ${{ 
-    github.ref_name == 'main' && secrets.SNOWFLAKE_DATABASE_PROD || 
-    github.ref_name == 'dev' && secrets.SNOWFLAKE_DATABASE_DEV || 
-    secrets.SNOWFLAKE_DATABASE_STAGE }}
-  SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
+    branches:
+      - dev
+      - stage
+      - main
 
 jobs:
-  Build:
-    name: Build and Train Model
-    if: github.ref == 'refs/heads/dev'
+  install-train-upload:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout repository
+      - name: Checkout Code
         uses: actions/checkout@v3
 
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.11"
+          python-version: 3.11
 
-  DeployDev:
-    name: Deploy to Dev
-    if: github.ref == 'refs/heads/dev'
-    needs: Build
-    runs-on: ubuntu-latest
-    environment:
-      name: Dev
-      url: http://dev.mymodel.endpoint
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-        
-      - name: Install dependencies
+      - name: Install Dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r ml/requirements.txt
+          pip install -r requirements.txt
 
-      - name: Train model with Snowpark + MLflow
-        run: python ml/train_model_c.py
+      - name: Train the Model
+        run: |
+          python ml/train_model_c.py
 
-      - name: Upload model and deploy UDF
-        run: python ml/upload_model.py
-      - name: Upload MLflow logs
-        uses: actions/upload-artifact@v4
-        with:
-          name: mlflow-logs
-          path: mlruns/
+      - name: Upload Model to Snowflake Stage
+        run: |
+          python ml/upload_model.py
 
-  DeployStaging:
-    name: Deploy to Staging
+  run-ci-tests:
     if: github.ref == 'refs/heads/stage'
+    needs: install-train-upload
     runs-on: ubuntu-latest
-    environment:
-      name: Staging
-      url: http://test.mymodel.endpoint
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-      - name: Upload model and deploy UDF
-        run: python ml/upload_model.py
-      - name: Upload MLflow logs
-        uses: actions/upload-artifact@v4
-        with:
-          name: mlflow-logs
-          path: mlruns/
 
-  DeployProd:
-    name: Deploy to Production
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    environment:
-      name: Prod
-      url: http://prod.mymodel.endpoint
     steps:
-      - name: Checkout repository
+      - name: Checkout Code
         uses: actions/checkout@v3
-      - name: Upload model and deploy UDF
-        run: python ml/upload_model.py
-      - name: Upload MLflow logs
-        uses: actions/upload-artifact@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
         with:
-          name: mlflow-logs
-          path: mlruns/
+          python-version: 3.11
+
+      - name: Install Dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run CI Tests
+        run: |
+          python tests/test_pipeline.py
