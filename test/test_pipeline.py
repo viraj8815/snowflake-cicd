@@ -67,6 +67,9 @@ with open(metrics_local) as f:
 # CI TESTS
 # -------------------------------
 def test_accuracy_threshold():
+    assert "accuracy" in metrics, "❌ 'accuracy' key missing in metrics.json"
+    assert "f1_score" in metrics, "❌ 'f1_score' key missing in metrics.json"
+    
     assert metrics["accuracy"] >= MIN_ACCURACY, f"❌ Accuracy too low: {metrics['accuracy']}"
     assert metrics["f1_score"] >= MIN_F1, f"❌ F1 score too low: {metrics['f1_score']}"
 
