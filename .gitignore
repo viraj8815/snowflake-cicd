@@ -3,3 +3,6 @@ ml/model.pkl.gz
 ml/model.pkl.gz
 *.pkl.gz
 snowflake-cicd.git/
+.github/workflows/ci-validate.yml
+.github/workflows/mlops1.yml
+mlruns/

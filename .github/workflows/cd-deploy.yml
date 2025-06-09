@@ -3,7 +3,7 @@ name: Snowflake CD Pipeline (PROD - Real Deployment)
 on:
   push:
     branches:
-      - main
+      - mai
 
 jobs:
   deploy-to-prod:

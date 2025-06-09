@@ -1,15 +1,30 @@
-name: MLOps - Train & Upload Model to Snowflake
+name: MLOps Pipeline
 
 on:
   push:
-    branches: [stage, main]
+    branches:
+      - dev
+      - stage
+      - main
+
+env:
+  SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+  SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+  SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+  SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
+  SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+  SNOWFLAKE_DATABASE: ${{ 
+    github.ref_name == 'main' && secrets.SNOWFLAKE_DATABASE_PROD || 
+    github.ref_name == 'dev' && secrets.SNOWFLAKE_DATABASE_DEV || 
+    secrets.SNOWFLAKE_DATABASE_STAGE }}
+  SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
 
 jobs:
-  mlops:
+  install-train-upload:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v3
 
       - name: Set up Python
@@ -17,28 +32,42 @@ jobs:
         with:
           python-version: 3.11
 
-      - name: Install dependencies
+      - name: Install Dependencies
         run: |
           pip install -r ml/requirements.txt
 
-      - name: Train ML model
-        run: python ml/train_model.py
-        env:
-          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
-          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
-          SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
-          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
-          SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE_STAGE }}
-          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
+      - name: Train the Model
+        run: |
+          python ml/train_model_c.py
 
-      - name: Upload model to Snowflake stage
-        run: python ml/upload_model.py
-        env:
-          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
-          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
-          SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
-          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
-          SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE_STAGE }}
-          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
+      - name: Upload Model to Snowflake Stage
+        run: |
+          python ml/upload_model.py
+
+      - name: Upload MLflow logs
+        uses: actions/upload-artifact@v4
+        with:
+          name: mlflow-logs
+          path: mlruns/
+
+  run-ci-tests:
+    if: github.ref_name == 'stage'
+    needs: install-train-upload
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
+
+      - name: Install Dependencies
+        run: |
+          pip install -r ml/requirements.txt
+
+      - name: Run CI Tests
+        run: |
+          python test/test_pipeline.py
