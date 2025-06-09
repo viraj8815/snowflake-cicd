@@ -50,6 +50,10 @@ jobs:
           name: mlflow-logs
           path: mlruns/
 
+      - name: Run CI Tests
+        run: |
+          python test/test_pipeline.py
+
   run-ci-tests:
     if: github.ref_name == 'stage'
     needs: install-train-upload
