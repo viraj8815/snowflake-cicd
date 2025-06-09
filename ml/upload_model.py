@@ -164,7 +164,8 @@ with gzip.open(model_path, "rb") as f:
 label_mapping = {0: "Low", 1: "Medium", 2: "High"}
 
 def predict(*args):
-    return model.predict([list(args)])[0]
+    pred = model.predict([list(args)])[0]
+    return label_mapping.get(pred, "Unknown")
 $$;
     """.replace("{version}", version))
     print("✅ UDF deployed with champion model.")
