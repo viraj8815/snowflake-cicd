@@ -38,7 +38,7 @@ jobs:
 
       - name: Train the Model
         run: |
-          python ml/train_model_C.py
+          python ml/train_model_c.py
 
       - name: Upload Model to Snowflake Stage
         run: |
