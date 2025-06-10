@@ -18,6 +18,9 @@ env:
     github.ref_name == 'dev' && secrets.SNOWFLAKE_DATABASE_DEV || 
     secrets.SNOWFLAKE_DATABASE_STAGE }}
   SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
+  ENV_NAME: ${{ 
+    github.ref_name == 'main' && 'PROD' || 
+    github.ref_name == 'dev' && 'DEV' || 'STAGE'}}
 
 jobs:
   install-train-upload:

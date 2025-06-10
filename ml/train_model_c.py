@@ -141,12 +141,13 @@ with open("ml/drift_baseline.json", "w") as f:
 # -----------------------------
 # Log to MLflow
 # -----------------------------
+env_name = os.environ.get("ENV_NAME", "DEV").upper()
 experiment_name = "snowflake-high-spender-rf"
 mlflow.set_experiment(experiment_name)
 client = MlflowClient()
 experiment = client.get_experiment_by_name(experiment_name)
 version_number = len(client.search_runs(experiment.experiment_id)) + 1
-run_name = f"catboost_highspender_v{version_number}"
+run_name = f"{env_name}_catboost_highspender_v{version_number}"
 
 with mlflow.start_run(run_name=run_name) as run:
     mlflow.set_tag("model_version", run_name)
